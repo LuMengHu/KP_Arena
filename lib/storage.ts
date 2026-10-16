@@ -75,6 +75,8 @@ async function putRaw(key: string, body: Buffer | string, contentType: string, c
     }
     return;
   }
+  // Vercel's filesystem is read-only, so local mode there means the R2 settings are missing.
+  if (process.env.VERCEL) throw new Error('伺服器未設定 R2 環境變數，無法儲存。請在 Vercel 填好 R2_* 後重新部署。');
   const file = path.join(localDir, key);
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, body);

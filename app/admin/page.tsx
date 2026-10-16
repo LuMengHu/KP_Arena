@@ -1,6 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Icon, Kapok } from '@/components/icons';
+import { macauNow } from '@/components/ui';
 import { parseWorkbook, type ImportResult } from '@/lib/excel';
 import { finalizeRows, recordFor, warnings } from '@/lib/marks';
 import type { Live, Meet, ResultRow, Round } from '@/lib/types';
@@ -21,7 +23,7 @@ async function api<T>(url: string, body?: unknown, method = 'POST'): Promise<T> 
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `錯誤 ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(data.error ?? `錯誤 ${res.status}`), { status: res.status });
   return data as T;
 }
 
@@ -29,24 +31,35 @@ function Login({ onDone }: { onDone: () => void }) {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
   return (
     <form
       className="card adminLogin"
       onSubmit={async (e) => {
         e.preventDefault();
+        setBusy(true);
+        setErr('');
         try {
           await api('/api/admin/login', { name, password });
           onDone();
         } catch (e) {
           setErr((e as Error).message);
+        } finally {
+          setBusy(false);
         }
       }}
     >
-      <h2>工作人員登入</h2>
+      <div className="mark">
+        <Kapok size={36} />
+      </div>
+      <h2>紅棉賽場 · 工作人員登入</h2>
       <input placeholder="你的名字（記錄誰發佈了成績）" value={name} onChange={(e) => setName(e.target.value)} required />
       <input placeholder="密碼" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       {err ? <div className="err">{err}</div> : null}
-      <button className="primary">登入</button>
+      <button className="primary" disabled={busy}>
+        {busy ? '登入中…' : '登入'}
+      </button>
+      <p className="sub center">管理員可匯入名單和相片；成績錄入員只能錄成績。</p>
     </form>
   );
 }
@@ -57,7 +70,20 @@ function emptyRow(): ResultRow {
   return { bib: '', mark: '', status: '' };
 }
 
-function ResultEditor({ round, state, onSaved }: { round: Round; state: State; onSaved: (live: Live) => void }) {
+// msg lives in the parent: publishing re-mounts the editor (to show the saved rows), which would wipe local state.
+function ResultEditor({
+  round,
+  state,
+  onSaved,
+  msg,
+  setMsg,
+}: {
+  round: Round;
+  state: State;
+  onSaved: (live: Live) => void;
+  msg: string;
+  setMsg: (m: string) => void;
+}) {
   const { meet, live } = state;
   const relay = round.kind === 'relay' || round.kind === 'other';
   const existing = live.results[round.id];
@@ -72,8 +98,14 @@ function ResultEditor({ round, state, onSaved }: { round: Round; state: State; o
   };
   const [rows, setRows] = useState<ResultRow[]>(initial);
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
   const byBib = useMemo(() => new Map(meet.athletes.map((a) => [a.bib, a])), [meet]);
+  const table = useRef<HTMLTableElement>(null);
+  // Enter in a mark box jumps to the next row's mark, so a heat can be typed straight from the paper sheet.
+  const nextMark = (e: React.KeyboardEvent<HTMLInputElement>, i: number) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    table.current?.querySelector<HTMLInputElement>(`input[data-mark="${i + 1}"]`)?.focus();
+  };
 
   const set = (i: number, patch: Partial<ResultRow>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const named = rows.filter((r) => r.bib || r.team || r.name);
@@ -105,14 +137,14 @@ function ResultEditor({ round, state, onSaved }: { round: Round; state: State; o
   return (
     <div className="card editor">
       <h3>
-        #{round.id} {round.time} {round.title}
+        #{round.id} · {round.time} · {round.title}
       </h3>
       <div className="sub">
         {record ? `大會紀錄 ${record.mark}（${record.holder} ${record.year}）· ` : ''}
         {round.kind === 'field' ? '成績越大越好，例如 5.20' : '成績越小越好，例如 12.34 或 2:15.30'}
         {' · '}名次可留空，系統按成績自動排
       </div>
-      <table className="tbl edit">
+      <table className="tbl edit" ref={table}>
         <thead>
           <tr>
             <th>組</th>
@@ -144,7 +176,15 @@ function ResultEditor({ round, state, onSaved }: { round: Round; state: State; o
                   )}
                 </td>
                 <td>
-                  <input className="w5" inputMode="decimal" value={r.mark} onChange={(e) => set(i, { mark: e.target.value })} />
+                  <input
+                    className="w5"
+                    inputMode="decimal"
+                    enterKeyHint="next"
+                    data-mark={i}
+                    value={r.mark}
+                    onKeyDown={(e) => nextMark(e, i)}
+                    onChange={(e) => set(i, { mark: e.target.value })}
+                  />
                 </td>
                 <td>
                   <input className="w2" inputMode="numeric" value={r.rank ?? ''} onChange={(e) => set(i, { rank: Number(e.target.value) || null })} />
@@ -158,8 +198,8 @@ function ResultEditor({ round, state, onSaved }: { round: Round; state: State; o
                   </select>
                 </td>
                 <td>
-                  <button className="link" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
-                    ✕
+                  <button className="link" aria-label="刪除此行" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}>
+                    <Icon name="x" size={16} />
                   </button>
                 </td>
               </tr>
@@ -167,8 +207,8 @@ function ResultEditor({ round, state, onSaved }: { round: Round; state: State; o
           })}
         </tbody>
       </table>
-      <button className="ghost" onClick={() => setRows((rs) => [...rs, emptyRow()])}>
-        ＋ 加一行
+      <button className="link" onClick={() => setRows((rs) => [...rs, emptyRow()])}>
+        <Icon name="plus" size={14} /> 加一行
       </button>
       {blank ? <div className="sub">另有 {blank} 行未填成績，不會發佈。</div> : null}
       {warn.length ? (
@@ -208,41 +248,98 @@ function ResultEditor({ round, state, onSaved }: { round: Round; state: State; o
   );
 }
 
-function ResultsTab({ state, setLive }: { state: State; setLive: (l: Live) => void }) {
-  const [day, setDay] = useState(1);
+function ResultsTab({ state, setLive, reload }: { state: State; setLive: (l: Live) => void; reload: () => void }) {
+  const today = state.meet.days.find((d) => d.date === macauNow().date)?.day ?? 1;
+  const [day, setDay] = useState(today);
+  const [q, setQ] = useState('');
   const [sel, setSel] = useState<string | null>(null);
-  const rounds = state.meet.rounds.filter((r) => r.day === day);
+  const [msg, setMsg] = useState('');
+  const { results, running } = state.live;
+  const query = q.trim();
+  const rounds = query
+    ? state.meet.rounds.filter((r) => r.id.startsWith(query) || r.title.includes(query))
+    : state.meet.rounds.filter((r) => r.day === day);
   const round = state.meet.rounds.find((r) => r.id === sel);
+  const dayRounds = state.meet.rounds.filter((r) => r.day === day);
+
+  // Someone else may have published meanwhile: refresh when returning to the list, and every 30 s on it.
+  useEffect(() => {
+    if (sel) return;
+    const id = setInterval(reload, 30_000);
+    return () => clearInterval(id);
+  }, [sel, reload]);
+
+  if (round)
+    return (
+      <>
+        <button
+          className="link"
+          onClick={() => {
+            setSel(null);
+            setMsg('');
+            reload();
+          }}
+        >
+          <Icon name="back" size={14} /> 返回賽次列表
+        </button>
+        <ResultEditor
+          key={round.id + (results[round.id]?.publishedAt ?? '')}
+          round={round}
+          state={state}
+          onSaved={setLive}
+          msg={msg}
+          setMsg={setMsg}
+        />
+      </>
+    );
+
   return (
     <>
       <div className="tabs">
         {state.meet.days.map((d) => (
-          <button key={d.day} className={d.day === day ? 'on' : ''} onClick={() => setDay(d.day)}>
+          <button key={d.day} className={d.day === day && !query ? 'on' : ''} onClick={() => (setDay(d.day), setQ(''))}>
             <b>第{d.day}日</b>
             <small>{d.label}</small>
           </button>
         ))}
       </div>
-      {round ? (
-        <>
-          <button className="link" onClick={() => setSel(null)}>
-            ‹ 返回賽次列表
-          </button>
-          <ResultEditor key={round.id + (state.live.results[round.id]?.publishedAt ?? '')} round={round} state={state} onSaved={setLive} />
-        </>
-      ) : (
-        <div className="card">
-          {rounds.map((r) => (
-            <button key={r.id} className={`round adminRound ${state.live.results[r.id] ? 'done' : state.live.running.includes(r.id) ? 'running' : ''}`} onClick={() => setSel(r.id)}>
-              <span className="time">{r.time}</span>
-              <span className="rtitle">
-                #{r.id} {r.title}
-              </span>
-              <span className="sub">{state.live.results[r.id] ? '已發佈' : state.live.running.includes(r.id) ? '進行中' : ''}</span>
-            </button>
-          ))}
+      <div className="stats">
+        <div>
+          <b>
+            {dayRounds.filter((r) => results[r.id]).length}/{dayRounds.length}
+          </b>
+          <span>本日已發佈</span>
         </div>
-      )}
+        <div>
+          <b>{running.length}</b>
+          <span>進行中</span>
+        </div>
+        <div>
+          <b>{Object.values(results).reduce((n, x) => n + x.rows.filter((r) => r.record).length, 0)}</b>
+          <span>破紀錄</span>
+        </div>
+      </div>
+      <label className="search">
+        <Icon name="search" size={18} />
+        <input type="search" placeholder="輸入序號（如 105）或項目搜尋" value={q} onChange={(e) => setQ(e.target.value)} />
+      </label>
+      <div className="card">
+        {rounds.length === 0 ? <p className="empty">找不到賽次</p> : null}
+        {rounds.map((r) => (
+          <button key={r.id} className={`round adminRound ${results[r.id] ? 'done' : running.includes(r.id) ? 'running' : ''}`} onClick={() => setSel(r.id)}>
+            <span className="time">
+              {query ? <small>第{r.day}日</small> : null}
+              {r.time}
+            </span>
+            <span className="rtitle">
+              #{r.id} {r.title}
+              <span className="extra">{r.entries.length ? `名單 ${r.entries.length}` : '未有名單'}</span>
+            </span>
+            <span className="sub">{results[r.id] ? '已發佈' : running.includes(r.id) ? '進行中' : ''}</span>
+            <Icon name="chevron" size={16} className="chev" />
+          </button>
+        ))}
+      </div>
     </>
   );
 }
@@ -455,20 +552,42 @@ export default function AdminPage() {
   const [needLogin, setNeedLogin] = useState(false);
   const [tab, setTab] = useState<'results' | 'import' | 'photos' | 'settings'>('results');
 
+  const [loadErr, setLoadErr] = useState('');
   const load = useCallback(async () => {
     try {
       setState(await api<State>('/api/admin/state'));
       setNeedLogin(false);
-    } catch {
-      setNeedLogin(true);
+      setLoadErr('');
+    } catch (e) {
+      // only a missing/expired session sends you back to the login form; a network blip keeps your screen
+      if ((e as { status?: number }).status === 401) setNeedLogin(true);
+      else setLoadErr((e as Error).message);
     }
   }, []);
   useEffect(() => {
     load();
   }, [load]);
 
-  if (needLogin) return <div className="page admin"><main><Login onDone={load} /></main></div>;
-  if (!state) return <div className="page admin"><main>載入中…</main></div>;
+  if (needLogin)
+    return (
+      <div className="page admin">
+        <main>
+          <Login onDone={load} />
+        </main>
+      </div>
+    );
+  if (!state)
+    return (
+      <div className="page admin">
+        <main>
+          {loadErr ? <div className="warn">載入失敗：{loadErr}</div> : null}
+          <div className="skeleton">
+            <div />
+            <div />
+          </div>
+        </main>
+      </div>
+    );
 
   const setLive = (live: Live) => setState((s) => (s ? { ...s, live } : s));
   const setMeet = (meet: Meet) => setState((s) => (s ? { ...s, meet } : s));
@@ -490,40 +609,50 @@ export default function AdminPage() {
       <header className="bar">
         <span className="back" />
         <h1>紅棉賽場 · 後台</h1>
-        <span className="back" />
+        <button
+          className="back"
+          aria-label="登出"
+          onClick={async () => {
+            await fetch('/api/admin/login', { method: 'DELETE' });
+            setNeedLogin(true);
+          }}
+        >
+          <Icon name="logout" size={20} />
+        </button>
       </header>
       <main>
-        <div className="who">
-          <span>
-            {state.staff.name}（{isAdmin ? '管理員' : '成績錄入'}）
-            {state.storageMode === 'local' ? ' · 本機模式，資料只存在這台電腦' : ''}
+        {loadErr ? <div className="warn">更新失敗：{loadErr}</div> : null}
+        <div className="adminTop">
+          <span className="avatar">
+            <Icon name="user" size={20} />
           </span>
-          <span>
-            <button className="link" onClick={load}>
-              重新整理
-            </button>{' '}
-            <button
-              className="link"
-              onClick={async () => {
-                await fetch('/api/admin/login', { method: 'DELETE' });
-                setNeedLogin(true);
-              }}
-            >
-              登出
-            </button>
-          </span>
+          <div className="grow">
+            <div className="nm">{state.staff.name}</div>
+            <div className="sub">{isAdmin ? '管理員' : '成績錄入員'}</div>
+          </div>
+          <span className={`storage ${state.storageMode}`}>{state.storageMode === 'r2' ? '已連接 R2' : '本機模式'}</span>
+          <button className="chip" onClick={load}>
+            <Icon name="refresh" size={14} /> 重新整理
+          </button>
         </div>
-        <div className="chips">
-          {tabs.map(([k, label]) => (
-            <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
-              {label}
-            </button>
-          ))}
-        </div>
-        {tab === 'results' ? <ResultsTab state={state} setLive={setLive} /> : null}
+        {tabs.length > 1 ? (
+          <div className="chips">
+            {tabs.map(([k, label]) => (
+              <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        {tab === 'results' ? <ResultsTab state={state} setLive={setLive} reload={load} /> : null}
         {tab === 'import' && isAdmin ? <ImportTab state={state} setMeet={setMeet} /> : null}
         {tab === 'photos' && isAdmin ? <PhotosTab state={state} setMeet={setMeet} /> : null}
         {tab === 'settings' && isAdmin ? <SettingsTab state={state} setMeet={setMeet} /> : null}
+        <p className="sub center">
+          <a href="/" target="_blank" rel="noreferrer">
+            打開觀眾頁面 <Icon name="external" size={12} />
+          </a>
+        </p>
       </main>
     </div>
   );

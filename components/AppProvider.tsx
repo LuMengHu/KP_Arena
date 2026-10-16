@@ -1,7 +1,6 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import type { Lang } from '@/lib/eventName';
 import { t as translate, type Key } from '@/lib/i18n';
 import type { Athlete, Live, Meet } from '@/lib/types';
 
@@ -14,7 +13,6 @@ const MEET_EVERY = 5 * 60_000;
 export type Identity = { type: 'student'; bib: string } | { type: 'class'; cls: string } | { type: 'guest' };
 
 interface Ctx {
-  lang: Lang;
   t: (key: Key, vars?: Record<string, string | number>) => string;
   identity: Identity | null;
   setIdentity: (i: Identity | null) => void;
@@ -54,8 +52,6 @@ async function getJson<T>(name: string): Promise<T> {
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  // Traditional Chinese only (EN/PT removed at the school's request); the i18n layer stays for later.
-  const lang: Lang = 'zh';
   const [identity, setIdentityState] = useState<Identity | null>(null);
   const [meet, setMeet] = useState<Meet | null>(null);
   const [live, setLive] = useState<Live | null>(null);
@@ -113,8 +109,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const athleteByBib = useMemo(() => new Map((meet?.athletes ?? []).map((a) => [a.bib, a])), [meet]);
 
   const value: Ctx = {
-    lang,
-    t: (key, vars) => translate(lang, key, vars),
+    t: translate,
     identity,
     setIdentity: (i) => {
       setIdentityState(i);

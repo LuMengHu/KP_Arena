@@ -1,7 +1,6 @@
 // Parse a Chinese event title from the schedule (e.g. "男甲110M(欄)決[1.00M]")
-// into structured parts, and render it in zh / en / pt.
+// into structured parts.
 
-export type Lang = 'zh' | 'en' | 'pt';
 export type Kind = 'track' | 'field' | 'relay' | 'other';
 
 export interface ParsedTitle {
@@ -48,69 +47,9 @@ export function recordKey(p: ParsedTitle): string | null {
 
 export const lowerIsBetter = (kind: Kind) => kind !== 'field';
 
-const GROUP_EN: Record<string, string> = { 甲: 'A', 乙: 'B', 丙: 'C', 丁: 'D', 戊: 'E' };
+/** Titles typed into Excel sometimes carry stray spaces ("男甲 100M 初"); drop them for display. */
+export const titleFor = (raw: string) => raw.replace(/\s+/g, '');
 
-const FIELD_NAMES: Record<string, { en: string; pt: string }> = {
-  跳高: { en: 'High Jump', pt: 'Salto em Altura' },
-  跳遠: { en: 'Long Jump', pt: 'Salto em Comprimento' },
-  三級跳遠: { en: 'Triple Jump', pt: 'Triplo Salto' },
-  鉛球: { en: 'Shot Put', pt: 'Lançamento do Peso' },
-  壘球: { en: 'Softball Throw', pt: 'Lançamento da Bola' },
-  標槍: { en: 'Javelin', pt: 'Lançamento do Dardo' },
-  鐵餅: { en: 'Discus', pt: 'Lançamento do Disco' },
-};
+export const groupLabel = (group: string) => `${group}組`;
 
-const ROUND_NAMES: Record<string, { zh: string; en: string; pt: string }> = {
-  初: { zh: '初賽', en: 'Heats', pt: 'Eliminatórias' },
-  複: { zh: '複賽', en: 'Semi-final', pt: 'Meias-finais' },
-  決: { zh: '決賽', en: 'Final', pt: 'Final' },
-  分組決: { zh: '分組決賽', en: 'Final (by heats)', pt: 'Final por Séries' },
-  合組決: { zh: '合組決賽', en: 'Combined Final', pt: 'Final Conjunta' },
-};
-
-const SPECIAL: Record<string, { en: string; pt: string }> = {
-  親子接力賽: { en: 'Parent-Child Relay', pt: 'Estafeta Pais e Filhos' },
-  鏡平校友師生接力賽: { en: 'Alumni & Staff Relay', pt: 'Estafeta de Antigos Alunos e Professores' },
-};
-
-function eventName(event: string, lang: 'en' | 'pt'): string {
-  let e = event;
-  let prefix = '';
-  if (e.startsWith('三項全能')) {
-    prefix = lang === 'en' ? 'Triathlon ' : 'Triatlo ';
-    e = e.replace('三項全能', '');
-  }
-  if (FIELD_NAMES[e]) return prefix + FIELD_NAMES[e][lang];
-  const dist = e.match(/^(\d+x)?(\d+)M/i);
-  if (!dist) return prefix + e;
-  const d = `${dist[1] ?? ''}${dist[2]}m`;
-  if (e.includes('(欄)')) return prefix + (lang === 'en' ? `${d} Hurdles` : `${d} Barreiras`);
-  if (e.includes('(接)')) return prefix + (lang === 'en' ? `${d} Relay` : `Estafeta ${d}`);
-  return prefix + d;
-}
-
-export function titleFor(raw: string, lang: Lang): string {
-  const title = raw.replace(/\s+/g, '');
-  if (lang === 'zh') return raw.replace(/(\S)\s(\S)/g, '$1$2');
-  if (SPECIAL[title]) return SPECIAL[title][lang];
-  const p = parseTitle(title);
-  if (!p.gender) return title;
-  const g =
-    lang === 'en'
-      ? `${p.gender === 'M' ? 'Boys' : 'Girls'} ${GROUP_EN[p.group!]}`
-      : `${p.gender === 'M' ? 'Rapazes' : 'Raparigas'} ${GROUP_EN[p.group!]}`;
-  const parts = [g, eventName(p.event, lang)];
-  if (p.kind !== 'field' || p.round !== '決') parts.push(ROUND_NAMES[p.round][lang]);
-  return parts.join(' · ') + (p.hurdle ? ` [${p.hurdle.replace('M', 'm')}]` : '');
-}
-
-export function groupLabel(group: string, lang: Lang): string {
-  if (lang === 'zh') return `${group}組`;
-  return `${lang === 'en' ? 'Group' : 'Grupo'} ${GROUP_EN[group] ?? group}`;
-}
-
-export function genderLabel(g: 'M' | 'F', lang: Lang): string {
-  if (lang === 'zh') return g === 'M' ? '男' : '女';
-  if (lang === 'en') return g === 'M' ? 'Boys' : 'Girls';
-  return g === 'M' ? 'Rapazes' : 'Raparigas';
-}
+export const genderLabel = (g: 'M' | 'F') => (g === 'M' ? '男' : '女');

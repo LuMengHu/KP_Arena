@@ -1,39 +1,87 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { titleFor, type Lang } from '@/lib/eventName';
-import type { Live, ResultRow, Round } from '@/lib/types';
+import { usePathname, useRouter } from 'next/navigation';
+import { titleFor } from '@/lib/eventName';
+import type { Live, Meet, ResultRow, Round } from '@/lib/types';
 import { useApp } from './AppProvider';
+import { Icon, type IconName } from './icons';
 
-export function Shell({ title, back = true, children }: { title: string; back?: boolean; children: React.ReactNode }) {
-  const { t, meet, offline, lastFetch } = useApp();
+const TABS: [string, IconName, string][] = [
+  ['/', 'home', '首頁'],
+  ['/schedule', 'calendar', '賽程'],
+  ['/results', 'trophy', '成績'],
+  ['/me', 'star', '我的'],
+];
+
+function TabBar() {
+  const path = usePathname();
+  return (
+    <nav className="tabbar" aria-label="主選單">
+      {TABS.map(([href, icon, label]) => (
+        <Link key={href} href={href} className={path === href ? 'on' : ''} aria-current={path === href ? 'page' : undefined}>
+          <Icon name={icon} size={22} />
+          <span>{label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * Page frame shared by every public screen: sticky title bar (or a custom header on the home
+ * screen), notice banners, footer with refresh state, and the bottom tab bar.
+ */
+export function Shell({ title, header, children }: { title?: string; header?: React.ReactNode; children: React.ReactNode }) {
+  const { t, meet, offline, lastFetch, refresh } = useApp();
   const router = useRouter();
+  const path = usePathname();
+  const isTab = TABS.some(([href]) => href === path);
   return (
     <div className="page">
-      <header className="bar">
-        {back ? (
-          <button className="back" aria-label={t('back')} onClick={() => (history.length > 1 ? router.back() : router.push('/'))}>
-            ‹
-          </button>
-        ) : (
+      {header ?? (
+        <header className="bar">
+          {isTab ? (
+            <span className="back" />
+          ) : (
+            <button className="back" aria-label={t('back')} onClick={() => (history.length > 1 ? router.back() : router.push('/'))}>
+              <Icon name="back" size={24} />
+            </button>
+          )}
+          <h1>{title}</h1>
           <span className="back" />
-        )}
-        <h1>{title}</h1>
-        <span className="back" />
-      </header>
-      {meet?.notice ? <div className="notice">{meet.notice}</div> : null}
-      {meet?.demo ? <div className="demo">{t('demo')}</div> : null}
-      <main>{children}</main>
-      <footer className="foot">
-        <div>{offline ? t('offline') : t('autoRefresh')}</div>
-        {lastFetch ? (
-          <div>
-            {t('updated')} {lastFetch.toLocaleTimeString('zh-Hant', { hour12: false })}
+        </header>
+      )}
+      <main className={header ? 'overlap' : ''}>
+        {meet?.notice ? (
+          <div className="notice" role="status">
+            <Icon name="megaphone" size={18} />
+            <span>{meet.notice}</span>
           </div>
         ) : null}
+        {meet?.demo ? <div className="demo">{t('demo')}</div> : null}
+        {meet ? children : <Skeleton />}
+      </main>
+      <footer className="foot">
+        <button className={`sync ${offline ? 'off' : ''}`} onClick={refresh}>
+          <span className="dot" />
+          {offline ? t('offline') : t('autoRefresh')}
+          {lastFetch && !offline ? ` · ${t('updated')} ${lastFetch.toLocaleTimeString('zh-HK', { hour12: false, timeZone: 'Asia/Macau' })}` : ''}
+          <Icon name="refresh" size={14} />
+        </button>
         <div>{t('disclaimer')}</div>
       </footer>
+      <TabBar />
+    </div>
+  );
+}
+
+function Skeleton() {
+  return (
+    <div className="skeleton" aria-busy="true" aria-label="載入中">
+      <div />
+      <div />
+      <div />
     </div>
   );
 }
@@ -52,58 +100,77 @@ export function StatusBadge({ status }: { status: Status }) {
   return <span className={`badge ${status}`}>{status === 'done' ? t('done') : t('running')}</span>;
 }
 
-export function RoundLink({ round, extra }: { round: Round; extra?: React.ReactNode }) {
-  const { lang, live } = useApp();
+export function RoundLink({ round, extra, showDay }: { round: Round; extra?: React.ReactNode; showDay?: boolean }) {
+  const { live, t } = useApp();
   const status = statusOf(round, live);
   const hasRecord = live?.results[round.id]?.rows.some((r) => r.record);
   return (
     <Link href={`/round/${round.id}`} className={`round ${status}`}>
-      <span className="time">{round.time}</span>
+      <span className="time">
+        {showDay ? <small>{t('day', { n: round.day })}</small> : null}
+        {round.time}
+      </span>
       <span className="rtitle">
-        {titleFor(round.title, lang)}
-        {hasRecord ? <span className="fire" title="record"> 🔥</span> : null}
+        {titleFor(round.title)}
+        {hasRecord ? (
+          <span className="flame" title={t('newRecord')}>
+            <Icon name="flame" size={14} />
+          </span>
+        ) : null}
         {extra ? <span className="extra">{extra}</span> : null}
       </span>
       <StatusBadge status={status} />
+      <Icon name="chevron" size={16} className="chev" />
     </Link>
   );
+}
+
+/** Rank number; 1–3 get medal colours. */
+export function Rank({ n }: { n?: number | null }) {
+  if (!n) return <span className="rankno">–</span>;
+  return <span className={`rankno ${n <= 3 ? `m${n}` : ''}`}>{n}</span>;
 }
 
 export function ResultTable({ rows, highlight }: { rows: ResultRow[]; highlight?: (r: ResultRow) => boolean }) {
   const { t, athleteByBib } = useApp();
   return (
-    <table className="tbl">
-      <thead>
-        <tr>
-          <th>{t('rank')}</th>
-          <th>{t('name')}</th>
-          <th className="num">{t('mark')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((r, i) => {
-          const a = r.bib ? athleteByBib.get(r.bib) : undefined;
-          const name = r.name || a?.name || r.team || r.bib || '';
-          const cls = r.cls || a?.cls || '';
-          return (
-            <tr key={i} className={highlight?.(r) ? 'me' : ''}>
-              <td className="rank">{r.rank ?? '–'}</td>
-              <td>
-                <div>{name}</div>
-                <div className="sub">
-                  {[r.bib, cls].filter(Boolean).join(' · ')}
-                  {r.heat ? ` · ${t('heat', { n: r.heat })}` : ''}
-                </div>
-              </td>
-              <td className="num">
-                {r.status || r.mark}
-                {r.record ? <div className="rec">🔥 {t('newRecord')}</div> : null}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <ol className="results">
+      {rows.map((r, i) => {
+        const a = r.bib ? athleteByBib.get(r.bib) : undefined;
+        const name = r.name || a?.name || r.team || r.bib || '';
+        const cls = r.cls || a?.cls || '';
+        return (
+          <li key={i} className={`${highlight?.(r) ? 'me' : ''} ${r.status ? 'out' : ''}`}>
+            <Rank n={r.status ? null : r.rank} />
+            <div className="who">
+              <div className="nm">{name}</div>
+              <div className="sub">
+                {[r.bib && r.bib !== name ? r.bib : '', cls !== name ? cls : '', r.heat ? t('heat', { n: r.heat }) : ''].filter(Boolean).join(' · ')}
+              </div>
+            </div>
+            <div className="mk">
+              {r.status ? <span className="st">{STATUS[r.status]}</span> : r.mark}
+              {r.record ? (
+                <span className="rec">
+                  <Icon name="flame" size={12} /> {t('newRecord')}
+                </span>
+              ) : null}
+            </div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+const STATUS: Record<string, string> = { DNS: '缺席', DNF: '未完成', DQ: '犯規' };
+
+export function Empty({ icon, children }: { icon: IconName; children: React.ReactNode }) {
+  return (
+    <div className="empty">
+      <Icon name={icon} size={32} />
+      <p>{children}</p>
+    </div>
   );
 }
 
@@ -118,15 +185,41 @@ export const toMinutes = (time: string) => {
   return h * 60 + m;
 };
 
-const LOCALE = { zh: 'zh-HK', en: 'en-GB', pt: 'pt-PT' } as const;
+/** "10/28" from an ISO date. */
+export const shortDate = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
 
-/** "10月28日 週三" / "Wed 28 Oct" / "qua., 28/10" from an ISO date, in the chosen language. */
-export function dayLabel(date: string | undefined, lang: Lang): string {
+/** "10月28日 週三" from an ISO date. */
+export function dayLabel(date: string | undefined): string {
   if (!date) return '';
-  return new Date(`${date}T12:00:00+08:00`).toLocaleDateString(LOCALE[lang], {
+  return new Date(`${date}T12:00:00+08:00`).toLocaleDateString('zh-HK', {
     day: 'numeric',
     month: 'short',
     weekday: 'short',
     timeZone: 'Asia/Macau',
   });
+}
+
+export type Phase =
+  | { kind: 'before'; daysLeft: number }
+  | { kind: 'during'; day: number; done: number; total: number }
+  | { kind: 'between' }
+  | { kind: 'after'; done: number };
+
+/** Where we are relative to the meet, for the status strip on the home screen. */
+export function phaseOf(meet: Meet, live: Live | null): Phase {
+  const { date } = macauNow();
+  const days = meet.days;
+  const doneIn = (rounds: Round[]) => rounds.filter((r) => live?.results[r.id]).length;
+  if (!days.length || date < days[0].date) {
+    const first = days[0]?.date;
+    const daysLeft = first ? Math.round((Date.parse(first) - Date.parse(date)) / 86_400_000) : 0;
+    return { kind: 'before', daysLeft };
+  }
+  const today = days.find((d) => d.date === date);
+  if (today) {
+    const rounds = meet.rounds.filter((r) => r.day === today.day);
+    return { kind: 'during', day: today.day, done: doneIn(rounds), total: rounds.length };
+  }
+  if (date > days[days.length - 1].date) return { kind: 'after', done: doneIn(meet.rounds) };
+  return { kind: 'between' };
 }

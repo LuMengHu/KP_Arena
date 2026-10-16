@@ -8,13 +8,17 @@ export const metadata: Metadata = {
   manifest: '/manifest.webmanifest',
   // Student names are public on paper at the venue, but keep them out of search engines.
   robots: { index: false, follow: false },
-  appleWebApp: { capable: true, title: '紅棉賽場', statusBarStyle: 'default' },
+  appleWebApp: { capable: true, title: '紅棉賽場', statusBarStyle: 'black-translucent' },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#a3201f',
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#b3261e' },
+    { media: '(prefers-color-scheme: dark)', color: '#2a1513' },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

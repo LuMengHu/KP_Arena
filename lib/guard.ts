@@ -13,7 +13,8 @@ export async function guarded(need: Role, fn: (staff: { role: Role; name: string
   } catch (e) {
     const status = e instanceof ConflictError ? 409 : e instanceof BadRequest ? 400 : 500;
     console.error(e);
-    return NextResponse.json({ error: (e as Error).message }, { status });
+    const message = (e as Error).message;
+    return NextResponse.json({ error: status === 409 ? '剛好有其他人同時修改，請再試一次' : status === 500 ? `伺服器錯誤：${message}` : message }, { status });
   }
 }
 
