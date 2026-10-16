@@ -117,26 +117,7 @@ main {
 /* home */
 .hero-wrap {
   background: var(--brand);
-  padding: 14px 16px 22px;
-}
-.lang {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 14px;
-}
-.lang button {
-  border: 0;
-  border-radius: 999px;
-  padding: 5px 14px;
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  font-size: 13px;
-}
-.lang button.on {
-  background: #fff;
-  color: var(--brand);
-  font-weight: 700;
+  padding: 18px 16px 22px;
 }
 .hero {
   background: linear-gradient(160deg, var(--hero-a), var(--hero-b));

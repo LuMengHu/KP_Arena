@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useApp } from '@/components/AppProvider';
-import { LangSwitch, RoundLink, macauNow, toMinutes } from '@/components/ui';
+import { RoundLink, macauNow, toMinutes } from '@/components/ui';
 
 function IdentityPicker() {
   const { t, meet, setIdentity } = useApp();
@@ -143,7 +143,6 @@ export default function Home() {
   return (
     <div className="page home">
       <div className="hero-wrap">
-        <LangSwitch />
         <div className="hero">
           <div className="logo">鏡平</div>
           <div className="school">{t('school')}</div>

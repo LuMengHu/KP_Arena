@@ -6,24 +6,6 @@ import { titleFor, type Lang } from '@/lib/eventName';
 import type { Live, ResultRow, Round } from '@/lib/types';
 import { useApp } from './AppProvider';
 
-export function LangSwitch() {
-  const { lang, setLang } = useApp();
-  const opts: [Lang, string][] = [
-    ['zh', '中文'],
-    ['en', 'EN'],
-    ['pt', 'PT'],
-  ];
-  return (
-    <div className="lang">
-      {opts.map(([l, label]) => (
-        <button key={l} className={l === lang ? 'on' : ''} onClick={() => setLang(l)}>
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export function Shell({ title, back = true, children }: { title: string; back?: boolean; children: React.ReactNode }) {
   const { t, meet, offline, lastFetch } = useApp();
   const router = useRouter();

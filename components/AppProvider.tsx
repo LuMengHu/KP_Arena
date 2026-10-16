@@ -15,7 +15,6 @@ export type Identity = { type: 'student'; bib: string } | { type: 'class'; cls: 
 
 interface Ctx {
   lang: Lang;
-  setLang: (l: Lang) => void;
   t: (key: Key, vars?: Record<string, string | number>) => string;
   identity: Identity | null;
   setIdentity: (i: Identity | null) => void;
@@ -55,7 +54,8 @@ async function getJson<T>(name: string): Promise<T> {
 }
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>('zh');
+  // Traditional Chinese only (EN/PT removed at the school's request); the i18n layer stays for later.
+  const lang: Lang = 'zh';
   const [identity, setIdentityState] = useState<Identity | null>(null);
   const [meet, setMeet] = useState<Meet | null>(null);
   const [live, setLive] = useState<Live | null>(null);
@@ -64,7 +64,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const lastMeet = useRef(0);
 
   useEffect(() => {
-    setLangState(readLocal<Lang>('kp_lang') ?? 'zh');
     setIdentityState(readLocal<Identity>('kp_identity'));
     // show the last copy instantly (also covers a dead network at the stadium)
     const m = readLocal<Meet>('kp_meet');
@@ -115,11 +114,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value: Ctx = {
     lang,
-    setLang: (l) => {
-      setLangState(l);
-      writeLocal('kp_lang', l);
-      document.documentElement.lang = l === 'zh' ? 'zh-Hant' : l;
-    },
     t: (key, vars) => translate(lang, key, vars),
     identity,
     setIdentity: (i) => {

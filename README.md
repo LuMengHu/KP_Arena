@@ -2,7 +2,7 @@
 
 鏡平學校田徑運動會（2026年10月28日至30日）的網頁版賽程、名單與即時成績。手機瀏覽器打開即可使用，不需要安裝 App，也可以「加到主畫面」。
 
-- 觀眾：身份登入（學生號碼布 / 班級代號 / 其他）、三日賽程時間軸、比賽名單、成績、破紀錄、相片集、我的成績、中文 / EN / PT
+- 觀眾：身份登入（學生號碼布 / 班級代號 / 其他）、三日賽程時間軸、比賽名單、成績、破紀錄、相片集、我的成績（介面為繁體中文）
 - 工作人員（`/admin`）：匯入 Excel、逐場錄入並發佈成績、標記進行中、公告橫幅、修改賽次時間、上載相片縮圖
 - 成績以大會張貼的紙本為準，本系統與紙本並行
 
@@ -46,7 +46,7 @@ npm run dev         # http://localhost:3000 ，後台 http://localhost:3000/admi
 5. bucket → Settings → **CORS Policy** 填入（把網址換成 Vercel 網址）：
 
    ```json
-   [{ "AllowedOrigins": ["https://kp-arena.vercel.app"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["*"], "MaxAgeSeconds": 3600 }]
+   [{ "AllowedOrigins": ["https://kparena.site", "https://www.kparena.site", "https://kp-arena.vercel.app"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["*"], "MaxAgeSeconds": 3600 }]
    ```
 
 ### 2. Vercel
