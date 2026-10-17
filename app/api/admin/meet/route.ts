@@ -1,7 +1,7 @@
 // Admin edits to meet.json: roster / start-list / record import, notice banner,
-// schedule time changes, photo removal.
+// schedule time changes, photo removal, and wiping test data before the real meet.
 import { BadRequest, guarded } from '@/lib/guard';
-import { updateMeet } from '@/lib/storage';
+import { updateLive, updateMeet } from '@/lib/storage';
 import type { Athlete, MeetRecord } from '@/lib/types';
 
 interface EntryRow {
@@ -35,7 +35,8 @@ export async function POST(req: Request) {
               r.entries.push({ bib: e.bib || undefined, team: e.team || undefined, heat: e.heat || undefined, lane: e.lane || undefined });
             }
           }
-          if (athletes || entries) m.demo = false;
+          // samples/demo.xlsx carries fake names, so keep the "demo data" banner on for it
+          if (athletes || entries) m.demo = Boolean(body.demo);
         });
         return { meet, unknownRounds: [...unknownRounds] };
       }
@@ -61,6 +62,30 @@ export async function POST(req: Request) {
           m.photos = m.photos.filter((p) => p.id !== body.id);
         });
         return { meet };
+      }
+      case 'clear-results': {
+        // after a rehearsal: drop every published result, keep roster and start lists
+        const live = await updateLive((l) => {
+          l.results = {};
+          l.running = [];
+        });
+        return { live };
+      }
+      case 'clear-all': {
+        // remove demo / test data: roster, start lists, records, photos, notice and results (schedule and time edits stay)
+        const meet = await updateMeet((m) => {
+          m.athletes = [];
+          m.records = [];
+          m.photos = [];
+          m.notice = '';
+          m.demo = false;
+          for (const r of m.rounds) r.entries = [];
+        });
+        const live = await updateLive((l) => {
+          l.results = {};
+          l.running = [];
+        });
+        return { meet, live };
       }
       default:
         throw new BadRequest('unknown action');

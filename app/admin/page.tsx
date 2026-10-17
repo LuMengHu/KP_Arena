@@ -348,6 +348,7 @@ function ResultsTab({ state, setLive, reload }: { state: State; setLive: (l: Liv
 
 function ImportTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => void }) {
   const [parsed, setParsed] = useState<ImportResult | null>(null);
+  const [fileName, setFileName] = useState('');
   const [msg, setMsg] = useState('');
   return (
     <div className="card">
@@ -364,6 +365,7 @@ function ImportTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
         onChange={async (e) => {
           const f = e.target.files?.[0];
           if (!f) return;
+          setFileName(f.name);
           setMsg('');
           try {
             setParsed(await parseWorkbook(f, state.meet.rounds));
@@ -406,6 +408,7 @@ function ImportTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
                   athletes: parsed.athletes,
                   entries: parsed.entries,
                   records: parsed.records,
+                  demo: /demo|示範/i.test(fileName),
                 });
                 setMeet(res.meet);
                 setParsed(null);
@@ -506,16 +509,17 @@ function PhotosTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
 
 // ---------- notice & schedule ----------
 
-function SettingsTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => void }) {
+function SettingsTab({ state, setMeet, setLive }: { state: State; setMeet: (m: Meet) => void; setLive: (l: Live) => void }) {
   const [notice, setNotice] = useState(state.meet.notice);
   const [id, setId] = useState('');
   const [time, setTime] = useState('');
   const [msg, setMsg] = useState('');
-  const run = async (body: object) => {
+  const run = async (body: object, ok = '✅ 已更新，觀眾數分鐘內看到') => {
     try {
-      const res = await api<{ meet: Meet }>('/api/admin/meet', body);
-      setMeet(res.meet);
-      setMsg('✅ 已更新，觀眾數分鐘內看到');
+      const res = await api<{ meet?: Meet; live?: Live }>('/api/admin/meet', body);
+      if (res.meet) setMeet(res.meet);
+      if (res.live) setLive(res.live);
+      setMsg(ok);
     } catch (e) {
       setMsg('❌ ' + (e as Error).message);
     }
@@ -543,6 +547,28 @@ function SettingsTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => v
         </button>
       </div>
       {msg ? <div className="msg">{msg}</div> : null}
+      <h3 className="danger-h">清除資料</h3>
+      <p className="sub">
+        彩排後可只清除成績；正式名單到手前，先清除全部示範資料再匯入。賽程和改過的時間會保留。現有：運動員 {state.meet.athletes.length} 人，已發佈成績{' '}
+        {Object.keys(state.live.results).length} 場。
+      </p>
+      <div className="row">
+        <button
+          className="ghost danger"
+          onClick={() => prompt('會刪除所有已發佈的成績，不能復原。請輸入「清除」確認') === '清除' && run({ action: 'clear-results' }, '✅ 已清除所有成績')}
+        >
+          只清除成績
+        </button>
+        <button
+          className="ghost danger"
+          onClick={() =>
+            prompt('會刪除運動員、名單、大會紀錄、相片、公告和所有成績，不能復原。請輸入「清除」確認') === '清除' &&
+            run({ action: 'clear-all' }, '✅ 已清除全部資料，可以匯入正式名單')
+          }
+        >
+          清除全部資料
+        </button>
+      </div>
     </div>
   );
 }
@@ -599,7 +625,7 @@ export default function AdminPage() {
       ? [
           ['import', '匯入資料'],
           ['photos', '相片'],
-          ['settings', '公告與時間'],
+          ['settings', '公告、時間與清除'],
         ] as [Tab, string][]
       : []),
   ];
@@ -647,7 +673,7 @@ export default function AdminPage() {
         {tab === 'results' ? <ResultsTab state={state} setLive={setLive} reload={load} /> : null}
         {tab === 'import' && isAdmin ? <ImportTab state={state} setMeet={setMeet} /> : null}
         {tab === 'photos' && isAdmin ? <PhotosTab state={state} setMeet={setMeet} /> : null}
-        {tab === 'settings' && isAdmin ? <SettingsTab state={state} setMeet={setMeet} /> : null}
+        {tab === 'settings' && isAdmin ? <SettingsTab state={state} setMeet={setMeet} setLive={setLive} /> : null}
         <p className="sub center">
           <a href="/" target="_blank" rel="noreferrer">
             打開觀眾頁面 <Icon name="external" size={12} />

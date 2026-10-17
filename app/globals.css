@@ -1303,3 +1303,12 @@ div.warn {
 .notice + .filters {
   margin-top: -12px;
 }
+.danger-h {
+  margin-top: 24px !important;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.ghost.danger {
+  border-color: #d32f2f;
+  color: #d32f2f;
+}
