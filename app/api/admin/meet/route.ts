@@ -1,6 +1,7 @@
 // Admin edits to meet.json: roster / start-list / record import, notice banner,
 // schedule time changes, photo removal, and wiping test data before the real meet.
 import { BadRequest, guarded } from '@/lib/guard';
+import { ensurePins } from '@/lib/pins';
 import { resealAll, updateLive, updateMeet } from '@/lib/storage';
 import type { Athlete, MeetRecord } from '@/lib/types';
 
@@ -32,11 +33,18 @@ export async function POST(req: Request) {
                 unknownRounds.add(e.roundId);
                 continue;
               }
-              r.entries.push({ bib: e.bib || undefined, team: e.team || undefined, heat: e.heat || undefined, lane: e.lane || undefined });
+              r.entries.push({
+                bib: e.bib || undefined,
+                team: e.team || undefined,
+                heat: e.heat || undefined,
+                lane: e.lane || undefined,
+              });
             }
           }
           // samples/demo.xlsx carries fake names, so keep the "demo data" banner on for it
           if (athletes || entries) m.demo = Boolean(body.demo);
+          // new classes on the roster get a login PIN straight away
+          if (athletes) ensurePins(m);
         });
         return { meet, unknownRounds: [...unknownRounds] };
       }
@@ -63,6 +71,19 @@ export async function POST(req: Request) {
         });
         return { meet };
       }
+      case 'pins': {
+        // body.mode: 'missing' fills new classes, 'all' regenerates every PIN, 'set' changes one
+        const meet = await updateMeet((m) => {
+          if (body.mode === 'set') {
+            const pin = String(body.pin ?? '').trim();
+            if (!/^\d{4}$/.test(pin)) throw new BadRequest('密碼要是 4 位數字');
+            if (!m.classPins || !(body.cls in m.classPins)) throw new BadRequest('找不到此班級');
+            if (Object.entries(m.classPins).some(([c, p]) => c !== body.cls && p === pin)) throw new BadRequest('這個密碼已被其他班使用');
+            m.classPins[body.cls] = pin;
+          } else ensurePins(m, body.mode === 'all');
+        });
+        return { meet };
+      }
       case 'reseal': {
         await resealAll();
         return {};
@@ -84,6 +105,7 @@ export async function POST(req: Request) {
           m.notice = '';
           m.demo = false;
           for (const r of m.rounds) r.entries = [];
+          m.classPins = {};
         });
         const live = await updateLive((l) => {
           l.results = {};

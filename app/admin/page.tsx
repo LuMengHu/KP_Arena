@@ -13,8 +13,6 @@ interface State {
   meet: Meet;
   live: Live;
   storageMode: string;
-  encryption: 'on' | 'off';
-  needsReseal: boolean;
   dataUrl: string;
 }
 
@@ -25,7 +23,10 @@ async function api<T>(url: string, body?: unknown, method = 'POST'): Promise<T> 
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error ?? `錯誤 ${res.status}`), { status: res.status });
+  if (!res.ok)
+    throw Object.assign(new Error(data.error ?? `錯誤 ${res.status}`), {
+      status: res.status,
+    });
   return data as T;
 }
 
@@ -91,11 +92,22 @@ function ResultEditor({
   const existing = live.results[round.id];
   const initial = (): ResultRow[] => {
     // ranks are always computed from marks (here for display, and again on the server when publishing)
-    if (existing) return existing.rows.map((r) => ({ ...r, rank: null, record: undefined }));
+    if (existing)
+      return existing.rows.map((r) => ({
+        ...r,
+        rank: null,
+        record: undefined,
+      }));
     if (round.entries.length)
       return [...round.entries]
         .sort((a, b) => (a.heat ?? 0) - (b.heat ?? 0) || (a.lane ?? 0) - (b.lane ?? 0))
-        .map((e) => ({ bib: e.bib ?? '', team: e.team ?? '', heat: e.heat, mark: '', status: '' }));
+        .map((e) => ({
+          bib: e.bib ?? '',
+          team: e.team ?? '',
+          heat: e.heat,
+          mark: '',
+          status: '',
+        }));
     return Array.from({ length: Math.min(round.count ?? 8, 8) }, emptyRow);
   };
   const [rows, setRows] = useState<ResultRow[]>(initial);
@@ -124,7 +136,10 @@ function ResultEditor({
     setBusy(true);
     setMsg('');
     try {
-      const res = await api<{ live: Live }>('/api/admin/results', { roundId: round.id, ...body });
+      const res = await api<{ live: Live }>('/api/admin/results', {
+        roundId: round.id,
+        ...body,
+      });
       onSaved(res.live);
       setMsg(ok);
     } catch (e) {
@@ -170,7 +185,12 @@ function ResultEditor({
                     <input className="w4" inputMode="numeric" value={r.bib ?? ''} onChange={(e) => set(i, { bib: e.target.value.trim() })} />
                   )}
                   {relay || !meet.athletes.length ? (
-                    <input className="w6 nameIn" value={r.name ?? ''} placeholder={relay ? '名稱（可留空）' : '姓名'} onChange={(e) => set(i, { name: e.target.value })} />
+                    <input
+                      className="w6 nameIn"
+                      value={r.name ?? ''}
+                      placeholder={relay ? '名稱（可留空）' : '姓名'}
+                      onChange={(e) => set(i, { name: e.target.value })}
+                    />
                   ) : (
                     <div className="sub nowrap">{a ? `${a.name} ${a.cls}` : r.bib ? '⚠️ 不在名單' : ''}</div>
                   )}
@@ -219,7 +239,14 @@ function ResultEditor({
         </ul>
       ) : null}
       {preview.some((r) => r.record) ? (
-        <div className="warn">🔥 將標示破紀錄：{preview.filter((r) => r.record).map((r) => `${r.bib || r.team} ${r.mark}`).join('、')}。請總裁判確認後才發佈。</div>
+        <div className="warn">
+          🔥 將標示破紀錄：
+          {preview
+            .filter((r) => r.record)
+            .map((r) => `${r.bib || r.team} ${r.mark}`)
+            .join('、')}
+          。請總裁判確認後才發佈。
+        </div>
       ) : null}
       <div className="row">
         <button className="ghost" disabled={busy} onClick={() => send({ action: 'running', running: !live.running.includes(round.id) }, '已更新')}>
@@ -233,7 +260,9 @@ function ResultEditor({
         <button
           className="primary"
           disabled={busy || !filled.length}
-          onClick={() => confirm(`已對照紙本核對 ${filled.length} 行成績，確定發佈？`) && send({ action: 'publish', rows: filled }, '✅ 已發佈，觀眾約 30 秒內看到')}
+          onClick={() =>
+            confirm(`已對照紙本核對 ${filled.length} 行成績，確定發佈？`) && send({ action: 'publish', rows: filled }, '✅ 已發佈，觀眾約 30 秒內看到')
+          }
         >
           {existing ? '更新發佈' : '發佈成績'}
         </button>
@@ -241,7 +270,11 @@ function ResultEditor({
       {msg ? <div className="msg">{msg}</div> : null}
       {existing ? (
         <div className="sub">
-          上次發佈：{new Date(existing.publishedAt).toLocaleString('zh-Hant', { hour12: false })} · {existing.by}
+          上次發佈：
+          {new Date(existing.publishedAt).toLocaleString('zh-Hant', {
+            hour12: false,
+          })}{' '}
+          · {existing.by}
         </div>
       ) : null}
     </div>
@@ -256,9 +289,7 @@ function ResultsTab({ state, setLive, reload }: { state: State; setLive: (l: Liv
   const [msg, setMsg] = useState('');
   const { results, running } = state.live;
   const query = q.trim();
-  const rounds = query
-    ? state.meet.rounds.filter((r) => r.id.startsWith(query) || r.title.includes(query))
-    : state.meet.rounds.filter((r) => r.day === day);
+  const rounds = query ? state.meet.rounds.filter((r) => r.id.startsWith(query) || r.title.includes(query)) : state.meet.rounds.filter((r) => r.day === day);
   const round = state.meet.rounds.find((r) => r.id === sel);
   const dayRounds = state.meet.rounds.filter((r) => r.day === day);
 
@@ -282,14 +313,7 @@ function ResultsTab({ state, setLive, reload }: { state: State; setLive: (l: Liv
         >
           <Icon name="back" size={14} /> 返回賽次列表
         </button>
-        <ResultEditor
-          key={round.id + (results[round.id]?.publishedAt ?? '')}
-          round={round}
-          state={state}
-          onSaved={setLive}
-          msg={msg}
-          setMsg={setMsg}
-        />
+        <ResultEditor key={round.id + (results[round.id]?.publishedAt ?? '')} round={round} state={state} onSaved={setLive} msg={msg} setMsg={setMsg} />
       </>
     );
 
@@ -354,7 +378,8 @@ function ImportTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
     <div className="card">
       <h3>匯入 Excel</h3>
       <p className="sub">
-        一個 Excel 檔可同時包含三張表：運動員（號碼布、姓名、班級、性別、組別）、參賽名單（序號或項目、號碼布或隊伍、組次、道次）、大會紀錄（項目、成績、保持者、年份）。只匯入檔案中有的表，其他保持不變。
+        一個 Excel
+        檔可同時包含三張表：運動員（號碼布、姓名、班級、性別、組別）、參賽名單（序號或項目、號碼布或隊伍、組次、道次）、大會紀錄（項目、成績、保持者、年份）。只匯入檔案中有的表，其他保持不變。
         <a href="/template.xlsx" download>
           下載範本
         </a>
@@ -378,7 +403,11 @@ function ImportTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
         <div className="preview">
           <p>找到：{parsed.sheets.join('、') || '無'}</p>
           <ul>
-            {parsed.athletes ? <li>運動員 {parsed.athletes.length} 人（目前 {state.meet.athletes.length} 人，將整批取代）</li> : null}
+            {parsed.athletes ? (
+              <li>
+                運動員 {parsed.athletes.length} 人（目前 {state.meet.athletes.length} 人，將整批取代）
+              </li>
+            ) : null}
             {parsed.entries ? <li>參賽名單 {parsed.entries.length} 行（將整批取代現有名單）</li> : null}
             {parsed.records ? <li>大會紀錄 {parsed.records.length} 項</li> : null}
           </ul>
@@ -392,7 +421,8 @@ function ImportTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
           ) : null}
           {parsed.athletes?.length ? (
             <p className="sub">
-              例子：{parsed.athletes
+              例子：
+              {parsed.athletes
                 .slice(0, 3)
                 .map((a) => `${a.bib} ${a.name} ${a.cls} ${a.gender === 'M' ? '男' : '女'}${a.group}`)
                 .join('；')}
@@ -424,7 +454,8 @@ function ImportTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
       ) : null}
       {msg ? <div className="msg">{msg}</div> : null}
       <p className="sub">
-        現有資料：運動員 {state.meet.athletes.length} 人 · 有名單的賽次 {state.meet.rounds.filter((r) => r.entries.length).length}/{state.meet.rounds.length} · 大會紀錄 {state.meet.records.length} 項
+        現有資料：運動員 {state.meet.athletes.length} 人 · 有名單的賽次 {state.meet.rounds.filter((r) => r.entries.length).length}/{state.meet.rounds.length} ·
+        大會紀錄 {state.meet.records.length} 項
       </p>
     </div>
   );
@@ -471,7 +502,12 @@ function PhotosTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
           onClick={async () => {
             try {
               const dataUrl = await shrink(file!);
-              const res = await api<{ meet: Meet }>('/api/admin/photo', { dataUrl, url, caption, day });
+              const res = await api<{ meet: Meet }>('/api/admin/photo', {
+                dataUrl,
+                url,
+                caption,
+                day,
+              });
               setMeet(res.meet);
               setMsg('✅ 已新增');
               setCaption('');
@@ -494,7 +530,10 @@ function PhotosTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
               className="link"
               onClick={async () => {
                 if (!confirm('刪除這張相片？')) return;
-                const res = await api<{ meet: Meet }>('/api/admin/meet', { action: 'photo-delete', id: p.id });
+                const res = await api<{ meet: Meet }>('/api/admin/meet', {
+                  action: 'photo-delete',
+                  id: p.id,
+                });
                 setMeet(res.meet);
               }}
             >
@@ -507,19 +546,112 @@ function PhotosTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
   );
 }
 
+// ---------- class PINs ----------
+
+function PinsTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => void }) {
+  const [msg, setMsg] = useState('');
+  const pins = Object.entries(state.meet.classPins ?? {}).sort(([a], [b]) => a.localeCompare(b, 'zh-Hant'));
+  const counts = useMemo(() => {
+    const c = new Map<string, number>();
+    for (const a of state.meet.athletes) c.set(a.cls, (c.get(a.cls) ?? 0) + 1);
+    return c;
+  }, [state.meet.athletes]);
+  const missing = [...counts.keys()].filter((c) => !state.meet.classPins?.[c]).length;
+  const run = async (body: object, ok: string) => {
+    try {
+      const res = await api<{ meet: Meet }>('/api/admin/meet', {
+        action: 'pins',
+        ...body,
+      });
+      setMeet(res.meet);
+      setMsg(ok);
+    } catch (e) {
+      setMsg('❌ ' + (e as Error).message);
+    }
+  };
+  const download = () => {
+    // BOM so Excel opens the Chinese text correctly
+    const csv = '\ufeff班級,登入密碼,運動員人數\n' + pins.map(([c, p]) => `${c},'${p},${counts.get(c) ?? 0}`).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = '班級密碼.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+  return (
+    <div className="card">
+      <h3>班級登入密碼</h3>
+      <p className="sub">
+        每班一個 4
+        位數字密碼，交給班主任轉告同學和家長。用班級加密碼登入可看全部名單和成績，並標出本班。運動員也可以用「班級＋號碼布」登入。沒有登入的人只看到賽程。
+        匯入名單時，新班級會自動產生密碼。
+      </p>
+      {missing ? (
+        <div className="warn">
+          有 {missing} 個班級還沒有密碼。
+          <button className="link" onClick={() => run({ mode: 'missing' }, '✅ 已補上密碼')}>
+            立即產生
+          </button>
+        </div>
+      ) : null}
+      {pins.length ? (
+        <>
+          <div className="row">
+            <button className="primary" onClick={download}>
+              <Icon name="download" size={16} /> 下載密碼表（Excel 可開）
+            </button>
+            <button
+              className="ghost danger"
+              onClick={() =>
+                confirm('全部班級會換新密碼，舊密碼立即失效（已登入的手機不受影響）。確定？') && run({ mode: 'all' }, '✅ 已全部換新，請重新下載密碼表')
+              }
+            >
+              全部重新產生
+            </button>
+          </div>
+          {msg ? <div className="msg">{msg}</div> : null}
+          <table className="pins">
+            <thead>
+              <tr>
+                <th>班級</th>
+                <th>密碼</th>
+                <th>人數</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              {pins.map(([cls, pin]) => (
+                <tr key={cls}>
+                  <td>{cls}</td>
+                  <td className="mono">{pin}</td>
+                  <td>{counts.get(cls) ?? 0}</td>
+                  <td>
+                    <button
+                      className="link"
+                      onClick={() => {
+                        const v = prompt(`${cls} 班的新密碼（4 位數字）`, pin);
+                        if (v && v !== pin) run({ mode: 'set', cls, pin: v.trim() }, `✅ ${cls} 班密碼已改為 ${v.trim()}`);
+                      }}
+                    >
+                      修改
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : (
+        <p className="sub">{counts.size ? '' : '還沒有運動員名單。先到「匯入資料」匯入名單。'}</p>
+      )}
+      {!pins.length && msg ? <div className="msg">{msg}</div> : null}
+    </div>
+  );
+}
+
 // ---------- notice & schedule ----------
 
-function SettingsTab({
-  state,
-  setMeet,
-  setLive,
-  reload,
-}: {
-  state: State;
-  setMeet: (m: Meet) => void;
-  setLive: (l: Live) => void;
-  reload: () => void;
-}) {
+function SettingsTab({ state, setMeet, setLive }: { state: State; setMeet: (m: Meet) => void; setLive: (l: Live) => void }) {
   const [notice, setNotice] = useState(state.meet.notice);
   const [id, setId] = useState('');
   const [time, setTime] = useState('');
@@ -557,23 +689,6 @@ function SettingsTab({
         </button>
       </div>
       {msg ? <div className="msg">{msg}</div> : null}
-      <h3 className="danger-h">校內通行碼</h3>
-      {state.encryption === 'on' ? (
-        <p className="sub">
-          已開啟：觀眾第一次打開網站要輸入通行碼，存放在 R2 的資料已加密。要換碼，在 Vercel 把舊碼填進 PREVIOUS_ACCESS_CODE、新碼填進
-          ACCESS_CODE，重新部署後回來按下面的按鈕。
-        </p>
-      ) : (
-        <p className="sub">未開啟：任何知道網址的人都能看到名單和成績。在 Vercel 加上環境變數 ACCESS_CODE（通行碼）並重新部署即可開啟。</p>
-      )}
-      {state.needsReseal ? (
-        <div className="warn">
-          資料還未用目前的通行碼加密。
-          <button className="link" onClick={() => run({ action: 'reseal' }, '✅ 已重新加密').then(reload)}>
-            立即加密
-          </button>
-        </div>
-      ) : null}
       <h3 className="danger-h">清除資料</h3>
       <p className="sub">
         彩排後可只清除成績；正式名單到手前，先清除全部示範資料再匯入。賽程和改過的時間會保留。現有：運動員 {state.meet.athletes.length} 人，已發佈成績{' '}
@@ -603,7 +718,7 @@ function SettingsTab({
 export default function AdminPage() {
   const [state, setState] = useState<State | null>(null);
   const [needLogin, setNeedLogin] = useState(false);
-  const [tab, setTab] = useState<'results' | 'import' | 'photos' | 'settings'>('results');
+  const [tab, setTab] = useState<'results' | 'import' | 'pins' | 'photos' | 'settings'>('results');
 
   const [loadErr, setLoadErr] = useState('');
   const load = useCallback(async () => {
@@ -649,11 +764,12 @@ export default function AdminPage() {
   const tabs: [Tab, string][] = [
     ['results', '成績錄入'],
     ...(isAdmin
-      ? [
+      ? ([
           ['import', '匯入資料'],
+          ['pins', '班級密碼'],
           ['photos', '相片'],
           ['settings', '公告、時間與清除'],
-        ] as [Tab, string][]
+        ] as [Tab, string][])
       : []),
   ];
 
@@ -683,22 +799,11 @@ export default function AdminPage() {
             <div className="nm">{state.staff.name}</div>
             <div className="sub">{isAdmin ? '管理員' : '成績錄入員'}</div>
           </div>
-          <span className={`storage ${state.storageMode}`}>
-            {state.storageMode === 'r2' ? '已連接 R2' : '本機模式'}
-            {state.encryption === 'on' ? ' · 已加密' : ''}
-          </span>
+          <span className={`storage ${state.storageMode}`}>{state.storageMode === 'r2' ? '已連接 R2' : '本機模式'}</span>
           <button className="chip" onClick={load}>
             <Icon name="refresh" size={14} /> 重新整理
           </button>
         </div>
-        {isAdmin && state.needsReseal && tab !== 'settings' ? (
-          <div className="warn">
-            資料還未用通行碼加密，觀眾仍可直接讀取。
-            <button className="link" onClick={() => setTab('settings')}>
-              前往加密
-            </button>
-          </div>
-        ) : null}
         {tabs.length > 1 ? (
           <div className="chips">
             {tabs.map(([k, label]) => (
@@ -710,8 +815,9 @@ export default function AdminPage() {
         ) : null}
         {tab === 'results' ? <ResultsTab state={state} setLive={setLive} reload={load} /> : null}
         {tab === 'import' && isAdmin ? <ImportTab state={state} setMeet={setMeet} /> : null}
+        {tab === 'pins' && isAdmin ? <PinsTab state={state} setMeet={setMeet} /> : null}
         {tab === 'photos' && isAdmin ? <PhotosTab state={state} setMeet={setMeet} /> : null}
-        {tab === 'settings' && isAdmin ? <SettingsTab state={state} setMeet={setMeet} setLive={setLive} reload={load} /> : null}
+        {tab === 'settings' && isAdmin ? <SettingsTab state={state} setMeet={setMeet} setLive={setLive} /> : null}
         <p className="sub center">
           <a href="/" target="_blank" rel="noreferrer">
             打開觀眾頁面 <Icon name="external" size={12} />

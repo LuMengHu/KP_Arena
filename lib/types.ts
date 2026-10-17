@@ -63,6 +63,24 @@ export interface Meet {
   photos: Photo[];
   notice: string; // banner text, empty = none
   demo?: boolean;
+  /** class code -> 4-digit login PIN. Server-side only: stripped from every published copy. */
+  classPins?: Record<string, string>;
+}
+
+/**
+ * public.json: what visitors who are not logged in may see. The schedule only: no names,
+ * start lists or marks; just which rounds are running or have results.
+ */
+export interface PublicView {
+  version: number;
+  updatedAt: string;
+  name: Meet['name'];
+  days: Day[];
+  rounds: Round[]; // entries always []
+  notice: string;
+  demo?: boolean;
+  running: string[];
+  done: string[];
 }
 
 export interface ResultRow {

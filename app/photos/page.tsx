@@ -8,7 +8,7 @@ export default function PhotosPage() {
   const { t, meet, assetUrl } = useApp();
   const photos = [...(meet?.photos ?? [])].reverse();
   return (
-    <Shell title={t('photos')}>
+    <Shell title={t('photos')} members>
       {photos.length === 0 ? (
         <section className="card">
           <Empty icon="camera">{t('noPhotos')}</Empty>

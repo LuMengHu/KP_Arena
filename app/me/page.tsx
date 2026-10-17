@@ -6,32 +6,22 @@ import { Icon } from '@/components/icons';
 import { Empty, Rank, Shell, StatusBadge, statusOf } from '@/components/ui';
 import { titleFor } from '@/lib/eventName';
 
-// "My results": a student's own events, or every event a class takes part in.
+// "My results": an athlete's own events, or every event a class takes part in.
 export default function MePage() {
   const { t, identity, meet, live, athleteByBib } = useApp();
-  if (!identity || identity.type === 'guest') {
+  if (!identity)
     return (
-      <Shell title={t('myResults')}>
-        <section className="card">
-          <Empty icon="star">{t('signInFirst')}</Empty>
-          <div className="center">
-            <Link href="/" className="primary inline">
-              回首頁選擇身份
-            </Link>
-          </div>
-        </section>
+      <Shell title={t('myResults')} members>
+        {null}
       </Shell>
     );
-  }
   const mine = (bib?: string, team?: string) =>
-    identity.type === 'student'
-      ? bib === identity.bib
-      : team === identity.cls || (bib ? athleteByBib.get(bib)?.cls === identity.cls : false);
+    identity.type === 'athlete' ? bib === identity.bib : team === identity.cls || (bib ? athleteByBib.get(bib)?.cls === identity.cls : false);
 
   const rounds = (meet?.rounds ?? []).filter(
     (r) => r.entries.some((e) => mine(e.bib, e.team)) || live?.results[r.id]?.rows.some((x) => mine(x.bib, x.team ?? x.cls)),
   );
-  const me = identity.type === 'student' ? athleteByBib.get(identity.bib) : null;
+  const me = identity.type === 'athlete' ? athleteByBib.get(identity.bib) : null;
   const medals = rounds.flatMap((r) => (live?.results[r.id]?.rows ?? []).filter((x) => mine(x.bib, x.team ?? x.cls) && x.rank && x.rank <= 3 && !x.status));
   const count = (n: number) => medals.filter((m) => m.rank === n).length;
 

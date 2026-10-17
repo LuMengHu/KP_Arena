@@ -33,7 +33,7 @@ export default function EntriesPage() {
 
   const rounds = meet?.rounds ?? [];
   return (
-    <Shell title={t('entries')}>
+    <Shell title={t('entries')} members>
       <label className="search">
         <Icon name="search" size={18} />
         <input type="search" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} />

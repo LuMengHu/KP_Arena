@@ -3,16 +3,22 @@
 import { useParams } from 'next/navigation';
 import { useApp } from '@/components/AppProvider';
 import { Icon } from '@/components/icons';
-import { Empty, ResultTable, Shell, StatusBadge, dayLabel, statusOf } from '@/components/ui';
+import { Empty, LoginNeeded, ResultTable, Shell, StatusBadge, dayLabel, statusOf } from '@/components/ui';
 import { titleFor } from '@/lib/eventName';
 import { recordFor } from '@/lib/marks';
 import type { Entry } from '@/lib/types';
 
-const ROUND_NAME: Record<string, string> = { 初: '初賽', 複: '複賽', 決: '決賽', 分組決: '分組決賽', 合組決: '合組決賽' };
+const ROUND_NAME: Record<string, string> = {
+  初: '初賽',
+  複: '複賽',
+  決: '決賽',
+  分組決: '分組決賽',
+  合組決: '合組決賽',
+};
 
 export default function RoundPage() {
   const { id } = useParams<{ id: string }>();
-  const { t, meet, live, athleteByBib, identity } = useApp();
+  const { t, meet, live, athleteByBib, identity, loggedIn } = useApp();
   const round = meet?.rounds.find((r) => r.id === id);
   if (!meet) return <Shell title="">{null}</Shell>;
   if (!round)
@@ -27,7 +33,7 @@ export default function RoundPage() {
   const day = meet.days.find((d) => d.day === round.day);
   const broke = result?.rows.filter((r) => r.record) ?? [];
   const isMe = (bib?: string, cls?: string) =>
-    (identity?.type === 'student' && bib === identity.bib) ||
+    (identity?.type === 'athlete' && bib === identity.bib) ||
     (identity?.type === 'class' && (cls === identity.cls || athleteByBib.get(bib ?? '')?.cls === identity.cls));
 
   const heats = new Map<number, Entry[]>();
@@ -68,7 +74,9 @@ export default function RoundPage() {
         ) : null}
       </section>
 
-      {broke.length ? (
+      {!loggedIn ? <LoginNeeded compact /> : null}
+
+      {loggedIn && broke.length ? (
         <div className="banner-rec">
           <Icon name="flame" size={22} />
           <div>
@@ -78,53 +86,61 @@ export default function RoundPage() {
         </div>
       ) : null}
 
-      {result ? (
+      {loggedIn && result ? (
         <section className="card">
           <h3>
             {t('results')}
             <span className="sub right">
-              {new Date(result.publishedAt).toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Macau' })} 發佈
+              {new Date(result.publishedAt).toLocaleTimeString('zh-HK', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+                timeZone: 'Asia/Macau',
+              })}{' '}
+              發佈
             </span>
           </h3>
           <ResultTable rows={result.rows} highlight={(r) => isMe(r.bib, r.cls ?? r.team)} />
         </section>
       ) : null}
 
-      <section className="card">
-        <h3>{t('entries')}</h3>
-        {round.entries.length === 0 ? (
-          <Empty icon="list">{t('noEntries')}</Empty>
-        ) : (
-          [...heats.entries()]
-            .sort(([a], [b]) => a - b)
-            .map(([h, list]) => (
-              <div key={h} className="heat">
-                {heats.size > 1 ? <h4>{t('heat', { n: h })}</h4> : null}
-                <ul className="startlist">
-                  {[...list]
-                    .sort((a, b) => (a.lane ?? 99) - (b.lane ?? 99))
-                    .map((e, i) => {
-                      const a = e.bib ? athleteByBib.get(e.bib) : undefined;
-                      return (
-                        <li key={i} className={isMe(e.bib, e.team) ? 'me' : ''}>
-                          {e.lane ? (
-                            <span className="lane">
-                              <small>道</small>
-                              {e.lane}
-                            </span>
-                          ) : null}
-                          <div className="grow">
-                            <div className="nm">{a?.name ?? e.team ?? e.bib}</div>
-                            <div className="sub">{[e.bib, a?.cls].filter(Boolean).join(' · ')}</div>
-                          </div>
-                        </li>
-                      );
-                    })}
-                </ul>
-              </div>
-            ))
-        )}
-      </section>
+      {loggedIn ? (
+        <section className="card">
+          <h3>{t('entries')}</h3>
+          {round.entries.length === 0 ? (
+            <Empty icon="list">{t('noEntries')}</Empty>
+          ) : (
+            [...heats.entries()]
+              .sort(([a], [b]) => a - b)
+              .map(([h, list]) => (
+                <div key={h} className="heat">
+                  {heats.size > 1 ? <h4>{t('heat', { n: h })}</h4> : null}
+                  <ul className="startlist">
+                    {[...list]
+                      .sort((a, b) => (a.lane ?? 99) - (b.lane ?? 99))
+                      .map((e, i) => {
+                        const a = e.bib ? athleteByBib.get(e.bib) : undefined;
+                        return (
+                          <li key={i} className={isMe(e.bib, e.team) ? 'me' : ''}>
+                            {e.lane ? (
+                              <span className="lane">
+                                <small>道</small>
+                                {e.lane}
+                              </span>
+                            ) : null}
+                            <div className="grow">
+                              <div className="nm">{a?.name ?? e.team ?? e.bib}</div>
+                              <div className="sub">{[e.bib, a?.cls].filter(Boolean).join(' · ')}</div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                </div>
+              ))
+          )}
+        </section>
+      ) : null}
     </Shell>
   );
 }

@@ -13,7 +13,7 @@ export default function RecordsPage() {
     (live?.results[r.id]?.rows ?? []).filter((row) => row.record).map((row) => ({ r, row })),
   );
   return (
-    <Shell title={t('records')}>
+    <Shell title={t('records')} members>
       {broken.length === 0 ? (
         <section className="card">
           <Empty icon="flame">{t('noRecordsBroken')}</Empty>

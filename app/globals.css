@@ -268,15 +268,11 @@ main.overlap .demo {
   text-align: center;
   color: #fff;
   padding: calc(26px + env(safe-area-inset-top)) 20px 64px;
-  background:
-    radial-gradient(120% 80% at 50% 0%, #e2513f 0%, transparent 70%),
-    linear-gradient(170deg, #c4302a 0%, #8f1c16 100%);
+  background: radial-gradient(120% 80% at 50% 0%, #e2513f 0%, transparent 70%), linear-gradient(170deg, #c4302a 0%, #8f1c16 100%);
 }
 @media (prefers-color-scheme: dark) {
   .hero {
-    background:
-      radial-gradient(120% 80% at 50% 0%, #7d2a22 0%, transparent 70%),
-      linear-gradient(170deg, #5c1612 0%, #2a0f0d 100%);
+    background: radial-gradient(120% 80% at 50% 0%, #7d2a22 0%, transparent 70%), linear-gradient(170deg, #5c1612 0%, #2a0f0d 100%);
   }
 }
 .hero .petals {
@@ -585,6 +581,9 @@ input[type='file'] {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-bottom: 12px;
+}
+.tiles.one {
+  grid-template-columns: 1fr;
 }
 .tile {
   background: var(--card);
@@ -1344,4 +1343,71 @@ div.warn {
   place-items: center;
   background: var(--brand-soft);
   color: var(--brand);
+}
+
+/* viewer login */
+.login h2 {
+  margin-bottom: 12px;
+}
+.login label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.login .idform .primary {
+  margin-top: 4px;
+}
+.login > .sub {
+  margin: 10px 0 0;
+}
+.seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.seg button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+.seg button.on {
+  background: var(--card);
+  color: var(--brand);
+  box-shadow: var(--shadow);
+}
+
+/* admin: class PINs */
+table.pins {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 15px;
+}
+table.pins th,
+table.pins td {
+  text-align: left;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+}
+table.pins th {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 13px;
+}
+table.pins .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 17px;
+  letter-spacing: 2px;
 }

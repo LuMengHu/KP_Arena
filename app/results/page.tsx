@@ -14,7 +14,7 @@ export default function ResultsPage() {
     .filter((r) => live?.results[r.id] && (!group || r.group === group))
     .sort((a, b) => live!.results[b.id].publishedAt.localeCompare(live!.results[a.id].publishedAt));
   return (
-    <Shell title={t('results')}>
+    <Shell title={t('results')} members>
       <div className="chips">
         <button className={group === '' ? 'on' : ''} onClick={() => setGroup('')}>
           {t('all')}

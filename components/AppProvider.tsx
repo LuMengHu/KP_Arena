@@ -2,21 +2,32 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { t as translate, type Key } from '@/lib/i18n';
-import { isSealed, keyFromCode, normalizeCode, unseal } from '@/lib/seal';
-import type { Athlete, Live, Meet } from '@/lib/types';
+import { isSealed, keyFromB64, unseal } from '@/lib/seal';
+import type { Athlete, Live, Meet, PublicView } from '@/lib/types';
 
-// Where the public JSON lives. In production this is the R2 custom domain,
+// Where the published JSON lives. In production this is the R2 custom domain,
 // e.g. https://data.example.com. Without it we read through our own API route.
 const BASE = (process.env.NEXT_PUBLIC_DATA_URL ?? '').replace(/\/$/, '') || '/api/public';
 const LIVE_EVERY = 30_000;
 const MEET_EVERY = 5 * 60_000;
 
-export type Identity = { type: 'student'; bib: string } | { type: 'class'; cls: string } | { type: 'guest' };
+/** Logged-in viewer. Not logged in (null) = visitor: schedule only. */
+export type Identity = { type: 'athlete'; cls: string; bib: string } | { type: 'class'; cls: string };
+
+interface Auth {
+  identity: Identity;
+  key: string; // base64 data key from /api/login
+}
 
 interface Ctx {
   t: (key: Key, vars?: Record<string, string | number>) => string;
   identity: Identity | null;
-  setIdentity: (i: Identity | null) => void;
+  loggedIn: boolean;
+  /** resolves to an error message, or '' when logged in */
+  login: (body: { type: 'class'; cls: string; pin: string } | { type: 'athlete'; cls: string; bib: string }) => Promise<string>;
+  logout: () => void;
+  /** set when a saved login stopped working (the school changed the key) */
+  expired: boolean;
   meet: Meet | null;
   live: Live | null;
   offline: boolean;
@@ -24,8 +35,6 @@ interface Ctx {
   athleteByBib: Map<string, Athlete>;
   assetUrl: (key: string) => string;
   refresh: () => void;
-  lock: Lock;
-  unlock: (code: string) => Promise<boolean>;
 }
 
 const AppCtx = createContext<Ctx | null>(null);
@@ -47,115 +56,188 @@ function writeLocal(key: string, value: unknown) {
   }
 }
 
+class NotFound extends Error {}
+class BadKey extends Error {}
+
 async function getText(name: string): Promise<string> {
   // no-cache = revalidate with the CDN every time (cheap 304 when unchanged)
   const res = await fetch(`${BASE}/${name}`, { cache: 'no-cache' });
+  if (res.status === 404) throw new NotFound(name);
   if (!res.ok) throw new Error(`${name}: ${res.status}`);
   return res.text();
 }
 
-/** 'need': data is sealed and we have no code; 'wrong': the typed code failed; 'changed': the saved code stopped working. */
-export type Lock = 'open' | 'need' | 'wrong' | 'changed';
+/** Visitors get the schedule only: rebuild Meet/Live shapes so every page renders from the same types. */
+function fromPublic(p: PublicView): { meet: Meet; live: Live } {
+  return {
+    meet: {
+      version: p.version,
+      updatedAt: p.updatedAt,
+      name: p.name,
+      days: p.days,
+      rounds: p.rounds,
+      athletes: [],
+      records: [],
+      photos: [],
+      notice: p.notice,
+      demo: p.demo,
+    },
+    live: {
+      version: p.version,
+      updatedAt: p.updatedAt,
+      running: p.running,
+      results: Object.fromEntries(p.done.map((id) => [id, { rows: [], publishedAt: '', by: '' }])),
+    },
+  };
+}
 
-class Locked extends Error {}
+const CACHE_KEYS = ['kp_meet', 'kp_live', 'kp_public'];
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [identity, setIdentityState] = useState<Identity | null>(null);
+  const [auth, setAuth] = useState<Auth | null>(null);
+  const [ready, setReady] = useState(false);
+  const [expired, setExpired] = useState(false);
   const [meet, setMeet] = useState<Meet | null>(null);
   const [live, setLive] = useState<Live | null>(null);
   const [offline, setOffline] = useState(false);
   const [lastFetch, setLastFetch] = useState<Date | null>(null);
-  const [lock, setLock] = useState<Lock>('open');
   const lastMeet = useRef(0);
-  const key = useRef<CryptoKey | null>(null);
+  const key = useRef<{ b64: string; key: Promise<CryptoKey> } | null>(null);
+  const authRef = useRef<Auth | null>(null);
+  authRef.current = auth;
 
   useEffect(() => {
-    setIdentityState(readLocal<Identity>('kp_identity'));
+    writeLocal('kp_identity', null); // identity from the version without logins
+    const saved = readLocal<Auth>('kp_auth');
+    setAuth(saved);
     // show the last copy instantly (also covers a dead network at the stadium)
-    const m = readLocal<Meet>('kp_meet');
-    const l = readLocal<Live>('kp_live');
-    if (m) setMeet(m);
-    if (l) setLive(l);
+    if (saved) {
+      const m = readLocal<Meet>('kp_meet');
+      const l = readLocal<Live>('kp_live');
+      if (m) setMeet(m);
+      if (l) setLive(l);
+    } else {
+      const p = readLocal<PublicView>('kp_public');
+      if (p) {
+        const v = fromPublic(p);
+        setMeet(v.meet);
+        setLive(v.live);
+      }
+    }
+    setReady(true);
   }, []);
 
-  /** Parse a downloaded file, decrypting it with the school access code when it is sealed. */
-  const open = useCallback(async <T,>(text: string): Promise<T> => {
+  const signOut = useCallback((why: 'expired' | 'user') => {
+    for (const k of ['kp_auth', ...CACHE_KEYS]) writeLocal(k, null);
+    key.current = null;
+    lastMeet.current = 0;
+    setAuth(null);
+    setMeet(null);
+    setLive(null);
+    setExpired(why === 'expired');
+  }, []);
+
+  const open = useCallback(async <T,>(text: string, b64: string): Promise<T> => {
     const parsed = JSON.parse(text);
-    if (!isSealed(parsed)) return parsed as T;
-    if (!key.current) {
-      const saved = readLocal<string>('kp_code');
-      if (!saved) throw new Locked('need');
-      key.current = await keyFromCode(saved);
-    }
+    if (!isSealed(parsed)) return parsed as T; // only before the first upgrade re-seal
+    if (key.current?.b64 !== b64) key.current = { b64, key: keyFromB64(b64) };
     try {
-      return JSON.parse(await unseal(parsed, key.current)) as T;
+      return JSON.parse(await unseal(parsed, await key.current.key)) as T;
     } catch {
-      // the code was changed by the school: forget it and the copies it unlocked
-      key.current = null;
-      for (const k of ['kp_code', 'kp_meet', 'kp_live']) writeLocal(k, null);
-      setMeet(null);
-      setLive(null);
-      throw new Locked('changed');
+      throw new BadKey();
     }
   }, []);
 
   const poll = useCallback(
     async (forceMeet = false) => {
+      const a = authRef.current;
       try {
-        const jobs: Promise<unknown>[] = [
-          getText('live.json')
-            .then((t) => open<Live>(t))
-            .then((l) => {
-              setLive(l);
-              writeLocal('kp_live', l);
-            }),
-        ];
-        if (forceMeet || Date.now() - lastMeet.current > MEET_EVERY) {
-          jobs.push(
-            getText('meet.json')
-              .then((t) => open<Meet>(t))
-              .then((m) => {
-                lastMeet.current = Date.now();
-                setMeet(m);
-                writeLocal('kp_meet', m);
+        if (!a) {
+          let p: PublicView;
+          try {
+            p = JSON.parse(await getText('public.json'));
+          } catch (e) {
+            if (!(e instanceof NotFound)) throw e;
+            // public.json appears once staff open /admin after the upgrade; until then nothing to show
+            p = {
+              version: 0,
+              updatedAt: '',
+              name: { zh: '', en: '', pt: '' },
+              days: [],
+              rounds: [],
+              notice: '',
+              running: [],
+              done: [],
+            };
+          }
+          if (authRef.current) return; // logged in meanwhile
+          const v = fromPublic(p);
+          setMeet(v.meet);
+          setLive(v.live);
+          writeLocal('kp_public', p);
+        } else {
+          const jobs: Promise<unknown>[] = [
+            getText('live.json')
+              .then((t) => open<Live>(t, a.key))
+              .then((l) => {
+                if (authRef.current !== a) return;
+                setLive(l);
+                writeLocal('kp_live', l);
               }),
-          );
+          ];
+          if (forceMeet || Date.now() - lastMeet.current > MEET_EVERY) {
+            jobs.push(
+              getText('meet.json')
+                .then((t) => open<Meet>(t, a.key))
+                .then((m) => {
+                  if (authRef.current !== a) return;
+                  lastMeet.current = Date.now();
+                  setMeet(m);
+                  writeLocal('kp_meet', m);
+                }),
+            );
+          }
+          await Promise.all(jobs);
         }
-        await Promise.all(jobs);
-        setLock('open');
         setOffline(false);
         setLastFetch(new Date());
       } catch (e) {
-        if (e instanceof Locked) setLock(e.message as Lock);
+        if (e instanceof BadKey) signOut('expired');
         else setOffline(true);
       }
     },
-    [open],
+    [open, signOut],
   );
 
-  /** Try a typed access code; resolves false when it is wrong. */
-  const unlock = useCallback(
-    async (code: string) => {
-      const text = await getText('live.json');
-      const parsed = JSON.parse(text);
-      const k = await keyFromCode(code);
-      if (isSealed(parsed)) {
-        try {
-          await unseal(parsed, k);
-        } catch {
-          setLock('wrong');
-          return false;
-        }
+  const login: Ctx['login'] = useCallback(
+    async (body) => {
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) return data.error ?? `登入失敗（${res.status}）`;
+        const a: Auth = { identity: data.identity, key: data.key };
+        for (const k of CACHE_KEYS) writeLocal(k, null);
+        writeLocal('kp_auth', a);
+        authRef.current = a;
+        setAuth(a);
+        setExpired(false);
+        setMeet(null);
+        setLive(null);
+        await poll(true);
+        return '';
+      } catch {
+        return '網絡不穩，請再試一次';
       }
-      key.current = k;
-      writeLocal('kp_code', normalizeCode(code));
-      await poll(true);
-      return true;
     },
     [poll],
   );
 
   useEffect(() => {
+    if (!ready) return;
     poll(true);
     const id = setInterval(() => {
       if (document.visibilityState === 'visible') poll();
@@ -166,17 +248,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       clearInterval(id);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [poll]);
+  }, [poll, ready, auth]);
 
   const athleteByBib = useMemo(() => new Map((meet?.athletes ?? []).map((a) => [a.bib, a])), [meet]);
 
   const value: Ctx = {
     t: translate,
-    identity,
-    setIdentity: (i) => {
-      setIdentityState(i);
-      writeLocal('kp_identity', i);
-    },
+    identity: auth?.identity ?? null,
+    loggedIn: Boolean(auth),
+    login,
+    logout: () => signOut('user'),
+    expired,
     meet,
     live,
     offline,
@@ -184,8 +266,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     athleteByBib,
     assetUrl: (key) => `${BASE}/${key}`,
     refresh: () => poll(true),
-    lock,
-    unlock,
   };
   return <AppCtx.Provider value={value}>{children}</AppCtx.Provider>;
 }

@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { titleFor } from '@/lib/eventName';
 import type { Live, Meet, ResultRow, Round } from '@/lib/types';
 import { useApp } from './AppProvider';
@@ -33,8 +32,19 @@ function TabBar() {
  * Page frame shared by every public screen: sticky title bar (or a custom header on the home
  * screen), notice banners, footer with refresh state, and the bottom tab bar.
  */
-export function Shell({ title, header, children }: { title?: string; header?: React.ReactNode; children: React.ReactNode }) {
-  const { t, meet, offline, lastFetch, refresh, lock } = useApp();
+export function Shell({
+  title,
+  header,
+  members,
+  children,
+}: {
+  title?: string;
+  header?: React.ReactNode;
+  /** page only for logged-in classes and athletes */
+  members?: boolean;
+  children: React.ReactNode;
+}) {
+  const { t, meet, offline, lastFetch, refresh, loggedIn } = useApp();
   const router = useRouter();
   const path = usePathname();
   const isTab = TABS.some(([href]) => href === path);
@@ -61,7 +71,7 @@ export function Shell({ title, header, children }: { title?: string; header?: Re
           </div>
         ) : null}
         {meet?.demo ? <div className="demo">{t('demo')}</div> : null}
-        {lock !== 'open' ? <AccessGate /> : meet ? children : <Skeleton />}
+        {members && !loggedIn ? <LoginNeeded /> : meet ? children : <Skeleton />}
       </main>
       <footer className="foot">
         <button className={`sync ${offline ? 'off' : ''}`} onClick={refresh}>
@@ -77,43 +87,19 @@ export function Shell({ title, header, children }: { title?: string; header?: Re
   );
 }
 
-function AccessGate() {
-  const { lock, unlock } = useApp();
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const hint = lock === 'wrong' ? '通行碼不正確，請再試一次' : lock === 'changed' ? '學校已更新通行碼，請重新輸入' : '';
+/** Shown to visitors in place of names and results. */
+export function LoginNeeded({ compact }: { compact?: boolean }) {
   return (
-    <form
-      className="card lift gate"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (!code.trim()) return;
-        setBusy(true);
-        try {
-          await unlock(code);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
+    <section className={`card gate ${compact ? '' : 'lift'}`}>
       <span className="ico">
         <Icon name="lock" size={24} />
       </span>
-      <h2>請輸入校內通行碼</h2>
-      <p className="sub">賽程、名單和成績只供本校師生及家長查看。通行碼請向班主任索取。</p>
-      <input
-        autoFocus
-        autoComplete="off"
-        autoCapitalize="none"
-        placeholder="通行碼"
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-      />
-      {hint ? <div className="err">{hint}</div> : null}
-      <button className="primary" disabled={busy}>
-        {busy ? '驗證中…' : '進入'}
-      </button>
-    </form>
+      <h2>登入後可查看</h2>
+      <p className="sub">比賽名單、成績和相片只供本校班級及運動員查看。請用班級密碼，或班級代號加號碼布登入。</p>
+      <Link href="/#login" className="primary inline">
+        前往登入
+      </Link>
+    </section>
   );
 }
 
@@ -204,7 +190,11 @@ export function ResultTable({ rows, highlight }: { rows: ResultRow[]; highlight?
   );
 }
 
-const STATUS: Record<string, string> = { DNS: '缺席', DNF: '未完成', DQ: '犯規' };
+const STATUS: Record<string, string> = {
+  DNS: '缺席',
+  DNF: '未完成',
+  DQ: '犯規',
+};
 
 export function Empty({ icon, children }: { icon: IconName; children: React.ReactNode }) {
   return (
@@ -218,7 +208,10 @@ export function Empty({ icon, children }: { icon: IconName; children: React.Reac
 /** Macau local time (UTC+8) as "YYYY-MM-DD" and minutes since midnight. */
 export function macauNow() {
   const d = new Date(Date.now() + 8 * 3600_000);
-  return { date: d.toISOString().slice(0, 10), minutes: d.getUTCHours() * 60 + d.getUTCMinutes() };
+  return {
+    date: d.toISOString().slice(0, 10),
+    minutes: d.getUTCHours() * 60 + d.getUTCMinutes(),
+  };
 }
 
 export const toMinutes = (time: string) => {
@@ -259,7 +252,12 @@ export function phaseOf(meet: Meet, live: Live | null): Phase {
   const today = days.find((d) => d.date === date);
   if (today) {
     const rounds = meet.rounds.filter((r) => r.day === today.day);
-    return { kind: 'during', day: today.day, done: doneIn(rounds), total: rounds.length };
+    return {
+      kind: 'during',
+      day: today.day,
+      done: doneIn(rounds),
+      total: rounds.length,
+    };
   }
   if (date > days[days.length - 1].date) return { kind: 'after', done: doneIn(meet.rounds) };
   return { kind: 'between' };
