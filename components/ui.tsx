@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { titleFor } from '@/lib/eventName';
 import type { Live, Meet, ResultRow, Round } from '@/lib/types';
 import { useApp } from './AppProvider';
@@ -33,7 +34,7 @@ function TabBar() {
  * screen), notice banners, footer with refresh state, and the bottom tab bar.
  */
 export function Shell({ title, header, children }: { title?: string; header?: React.ReactNode; children: React.ReactNode }) {
-  const { t, meet, offline, lastFetch, refresh } = useApp();
+  const { t, meet, offline, lastFetch, refresh, lock } = useApp();
   const router = useRouter();
   const path = usePathname();
   const isTab = TABS.some(([href]) => href === path);
@@ -60,7 +61,7 @@ export function Shell({ title, header, children }: { title?: string; header?: Re
           </div>
         ) : null}
         {meet?.demo ? <div className="demo">{t('demo')}</div> : null}
-        {meet ? children : <Skeleton />}
+        {lock !== 'open' ? <AccessGate /> : meet ? children : <Skeleton />}
       </main>
       <footer className="foot">
         <button className={`sync ${offline ? 'off' : ''}`} onClick={refresh}>
@@ -73,6 +74,46 @@ export function Shell({ title, header, children }: { title?: string; header?: Re
       </footer>
       <TabBar />
     </div>
+  );
+}
+
+function AccessGate() {
+  const { lock, unlock } = useApp();
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const hint = lock === 'wrong' ? '通行碼不正確，請再試一次' : lock === 'changed' ? '學校已更新通行碼，請重新輸入' : '';
+  return (
+    <form
+      className="card lift gate"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!code.trim()) return;
+        setBusy(true);
+        try {
+          await unlock(code);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <span className="ico">
+        <Icon name="lock" size={24} />
+      </span>
+      <h2>請輸入校內通行碼</h2>
+      <p className="sub">賽程、名單和成績只供本校師生及家長查看。通行碼請向班主任索取。</p>
+      <input
+        autoFocus
+        autoComplete="off"
+        autoCapitalize="none"
+        placeholder="通行碼"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+      />
+      {hint ? <div className="err">{hint}</div> : null}
+      <button className="primary" disabled={busy}>
+        {busy ? '驗證中…' : '進入'}
+      </button>
+    </form>
   );
 }
 

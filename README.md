@@ -61,6 +61,8 @@ npm run dev         # http://localhost:3000 ，後台 http://localhost:3000/admi
    | `SESSION_SECRET` | 一串隨機字元（`openssl rand -hex 32`） |
    | `R2_ACCOUNT_ID` / `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_BUCKET` | 第 1 步取得 |
    | `NEXT_PUBLIC_DATA_URL` | R2 公開網址，例如 `https://data.你的網域` |
+   | `ACCESS_CODE` | 校內通行碼（可選）。設定後觀眾第一次打開要輸入，R2 上的資料會加密 |
+   | `PREVIOUS_ACCESS_CODE` | 換通行碼時填舊碼，讓系統仍能讀取舊資料 |
 
 3. Deploy。改了 `NEXT_PUBLIC_DATA_URL` 之後要重新 Deploy 一次才生效。
 
@@ -84,6 +86,8 @@ npm run dev         # http://localhost:3000 ，後台 http://localhost:3000/admi
 4. 按「發佈成績」，觀眾約 30 秒內看到。發錯可以改完再按「更新發佈」，或「撤回成績」。
 
 ## 已知限制（MVP）
+
+- 通行碼是全校共用，有人轉發給校外人士仍可查看；懷疑外洩就換碼（Vercel 改 `ACCESS_CODE`、舊碼填 `PREVIOUS_ACCESS_CODE`，重新部署後在後台按「立即加密」）。
 
 - 學生身份只存在手機本地，不設密碼；任何人輸入號碼布都能看該生成績（與紙本公開的資料相同）。
 - 沒有修改歷史，只記錄最後一次發佈的人和時間；紙本為最終依據。

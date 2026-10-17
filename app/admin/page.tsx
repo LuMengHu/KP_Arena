@@ -13,6 +13,8 @@ interface State {
   meet: Meet;
   live: Live;
   storageMode: string;
+  encryption: 'on' | 'off';
+  needsReseal: boolean;
   dataUrl: string;
 }
 
@@ -507,7 +509,17 @@ function PhotosTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => voi
 
 // ---------- notice & schedule ----------
 
-function SettingsTab({ state, setMeet, setLive }: { state: State; setMeet: (m: Meet) => void; setLive: (l: Live) => void }) {
+function SettingsTab({
+  state,
+  setMeet,
+  setLive,
+  reload,
+}: {
+  state: State;
+  setMeet: (m: Meet) => void;
+  setLive: (l: Live) => void;
+  reload: () => void;
+}) {
   const [notice, setNotice] = useState(state.meet.notice);
   const [id, setId] = useState('');
   const [time, setTime] = useState('');
@@ -545,6 +557,23 @@ function SettingsTab({ state, setMeet, setLive }: { state: State; setMeet: (m: M
         </button>
       </div>
       {msg ? <div className="msg">{msg}</div> : null}
+      <h3 className="danger-h">校內通行碼</h3>
+      {state.encryption === 'on' ? (
+        <p className="sub">
+          已開啟：觀眾第一次打開網站要輸入通行碼，存放在 R2 的資料已加密。要換碼，在 Vercel 把舊碼填進 PREVIOUS_ACCESS_CODE、新碼填進
+          ACCESS_CODE，重新部署後回來按下面的按鈕。
+        </p>
+      ) : (
+        <p className="sub">未開啟：任何知道網址的人都能看到名單和成績。在 Vercel 加上環境變數 ACCESS_CODE（通行碼）並重新部署即可開啟。</p>
+      )}
+      {state.needsReseal ? (
+        <div className="warn">
+          資料還未用目前的通行碼加密。
+          <button className="link" onClick={() => run({ action: 'reseal' }, '✅ 已重新加密').then(reload)}>
+            立即加密
+          </button>
+        </div>
+      ) : null}
       <h3 className="danger-h">清除資料</h3>
       <p className="sub">
         彩排後可只清除成績；正式名單到手前，先清除全部示範資料再匯入。賽程和改過的時間會保留。現有：運動員 {state.meet.athletes.length} 人，已發佈成績{' '}
@@ -654,11 +683,22 @@ export default function AdminPage() {
             <div className="nm">{state.staff.name}</div>
             <div className="sub">{isAdmin ? '管理員' : '成績錄入員'}</div>
           </div>
-          <span className={`storage ${state.storageMode}`}>{state.storageMode === 'r2' ? '已連接 R2' : '本機模式'}</span>
+          <span className={`storage ${state.storageMode}`}>
+            {state.storageMode === 'r2' ? '已連接 R2' : '本機模式'}
+            {state.encryption === 'on' ? ' · 已加密' : ''}
+          </span>
           <button className="chip" onClick={load}>
             <Icon name="refresh" size={14} /> 重新整理
           </button>
         </div>
+        {isAdmin && state.needsReseal && tab !== 'settings' ? (
+          <div className="warn">
+            資料還未用通行碼加密，觀眾仍可直接讀取。
+            <button className="link" onClick={() => setTab('settings')}>
+              前往加密
+            </button>
+          </div>
+        ) : null}
         {tabs.length > 1 ? (
           <div className="chips">
             {tabs.map(([k, label]) => (
@@ -671,7 +711,7 @@ export default function AdminPage() {
         {tab === 'results' ? <ResultsTab state={state} setLive={setLive} reload={load} /> : null}
         {tab === 'import' && isAdmin ? <ImportTab state={state} setMeet={setMeet} /> : null}
         {tab === 'photos' && isAdmin ? <PhotosTab state={state} setMeet={setMeet} /> : null}
-        {tab === 'settings' && isAdmin ? <SettingsTab state={state} setMeet={setMeet} setLive={setLive} /> : null}
+        {tab === 'settings' && isAdmin ? <SettingsTab state={state} setMeet={setMeet} setLive={setLive} reload={load} /> : null}
         <p className="sub center">
           <a href="/" target="_blank" rel="noreferrer">
             打開觀眾頁面 <Icon name="external" size={12} />

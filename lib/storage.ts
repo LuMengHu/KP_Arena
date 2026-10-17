@@ -6,6 +6,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import schedule from '@/data/schedule.json';
+import { isSealed, keyFromCode, seal, unseal } from './seal';
 import type { Live, Meet } from './types';
 
 const useR2 = Boolean(process.env.R2_ACCOUNT_ID && process.env.R2_BUCKET);
@@ -32,6 +33,40 @@ export const storageMode = useR2 ? 'r2' : 'local';
 interface Versioned<T> {
   doc: T;
   etag: string | null;
+  /** how the stored copy was protected: 'plain' or sealed with the previous code means it should be re-sealed */
+  sealedWith: 'plain' | 'current' | 'previous';
+}
+
+// ACCESS_CODE turns encryption on. PREVIOUS_ACCESS_CODE lets us still read files after the code is changed.
+const codes = {
+  current: process.env.ACCESS_CODE?.trim() || null,
+  previous: process.env.PREVIOUS_ACCESS_CODE?.trim() || null,
+};
+export const encryption = codes.current ? 'on' : 'off';
+const keys = new Map<string, Promise<CryptoKey>>();
+const keyFor = (code: string) => {
+  if (!keys.has(code)) keys.set(code, keyFromCode(code));
+  return keys.get(code)!;
+};
+
+async function decode<T>(body: Buffer): Promise<{ doc: T; sealedWith: Versioned<T>['sealedWith'] }> {
+  const parsed = JSON.parse(body.toString('utf8'));
+  if (!isSealed(parsed)) return { doc: parsed as T, sealedWith: 'plain' };
+  for (const which of ['current', 'previous'] as const) {
+    const code = codes[which];
+    if (!code) continue;
+    try {
+      return { doc: JSON.parse(await unseal(parsed, await keyFor(code))) as T, sealedWith: which };
+    } catch {
+      /* wrong code, try the next one */
+    }
+  }
+  throw new Error('資料已用通行碼加密，但伺服器的 ACCESS_CODE 對不上。換碼時請把舊碼填進 PREVIOUS_ACCESS_CODE。');
+}
+
+async function encode(doc: unknown): Promise<string> {
+  const json = JSON.stringify(doc);
+  return codes.current ? seal(json, await keyFor(codes.current)) : json;
 }
 
 async function getRaw(key: string): Promise<{ body: Buffer; etag: string | null } | null> {
@@ -106,8 +141,8 @@ export function emptyLive(): Live {
 
 async function load<T>(key: string, fallback: () => T): Promise<Versioned<T>> {
   const raw = await getRaw(key);
-  if (!raw) return { doc: fallback(), etag: null };
-  return { doc: JSON.parse(raw.body.toString('utf8')) as T, etag: raw.etag };
+  if (!raw) return { doc: fallback(), etag: null, sealedWith: 'current' };
+  return { ...(await decode<T>(raw.body)), etag: raw.etag };
 }
 
 export const loadMeet = () => load<Meet>('meet.json', emptyMeet);
@@ -131,7 +166,7 @@ async function update<T extends { version: number; updatedAt: string }>(
     doc.version += 1;
     doc.updatedAt = new Date().toISOString();
     try {
-      await putRaw(key, JSON.stringify(doc), 'application/json; charset=utf-8', CACHE[key], etag);
+      await putRaw(key, await encode(doc), 'application/json; charset=utf-8', CACHE[key], etag);
       return doc;
     } catch (e) {
       if (!(e instanceof ConflictError)) throw e;
@@ -142,6 +177,12 @@ async function update<T extends { version: number; updatedAt: string }>(
 
 export const updateMeet = (mutate: (m: Meet) => void) => update('meet.json', loadMeet, mutate);
 export const updateLive = (mutate: (l: Live) => void) => update('live.json', loadLive, mutate);
+
+/** Re-write both files so they are sealed with the current ACCESS_CODE (after turning it on or changing it). */
+export async function resealAll() {
+  await updateMeet(() => {});
+  await updateLive(() => {});
+}
 
 export async function putPhoto(key: string, jpeg: Buffer) {
   await putRaw(key, jpeg, 'image/jpeg', 'public, max-age=31536000, immutable');

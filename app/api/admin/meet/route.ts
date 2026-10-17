@@ -1,7 +1,7 @@
 // Admin edits to meet.json: roster / start-list / record import, notice banner,
 // schedule time changes, photo removal, and wiping test data before the real meet.
 import { BadRequest, guarded } from '@/lib/guard';
-import { updateLive, updateMeet } from '@/lib/storage';
+import { resealAll, updateLive, updateMeet } from '@/lib/storage';
 import type { Athlete, MeetRecord } from '@/lib/types';
 
 interface EntryRow {
@@ -62,6 +62,10 @@ export async function POST(req: Request) {
           m.photos = m.photos.filter((p) => p.id !== body.id);
         });
         return { meet };
+      }
+      case 'reseal': {
+        await resealAll();
+        return {};
       }
       case 'clear-results': {
         // after a rehearsal: drop every published result, keep roster and start lists
