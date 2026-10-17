@@ -287,8 +287,10 @@ main.overlap .demo {
   width: 76px;
   height: 76px;
   margin: 0 auto 12px;
-  border-radius: 20px;
-  box-shadow: 0 8px 22px rgba(40, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.18);
+  padding: 9px;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(40, 0, 0, 0.3);
 }
 .hero .school {
   font-size: 13px;
@@ -1172,10 +1174,9 @@ input[type='file'] {
 }
 .adminLogin .mark {
   display: block;
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   margin: 0 auto 4px;
-  border-radius: 16px;
 }
 .adminLogin h2 {
   text-align: center;

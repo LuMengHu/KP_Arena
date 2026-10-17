@@ -53,7 +53,7 @@ function Login({ onDone }: { onDone: () => void }) {
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img className="mark" src="/logo.png" alt="" width={64} height={64} />
+      <img className="mark" src="/logo.png" alt="" width={72} height={72} />
       <h2>紅棉賽場 · 工作人員登入</h2>
       <input placeholder="你的名字（記錄誰發佈了成績）" value={name} onChange={(e) => setName(e.target.value)} required />
       <input placeholder="密碼" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
