@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Icon, Kapok } from '@/components/icons';
+import { Icon } from '@/components/icons';
 import { macauNow } from '@/components/ui';
 import { parseWorkbook, type ImportResult } from '@/lib/excel';
 import { finalizeRows, formatMark, markValue, recordFor, warnings } from '@/lib/marks';
@@ -52,9 +52,8 @@ function Login({ onDone }: { onDone: () => void }) {
         }
       }}
     >
-      <div className="mark">
-        <Kapok size={36} />
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="mark" src="/logo.png" alt="" width={64} height={64} />
       <h2>紅棉賽場 · 工作人員登入</h2>
       <input placeholder="你的名字（記錄誰發佈了成績）" value={name} onChange={(e) => setName(e.target.value)} required />
       <input placeholder="密碼" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />

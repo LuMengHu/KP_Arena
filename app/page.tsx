@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useApp } from '@/components/AppProvider';
-import { Icon, Kapok, type IconName } from '@/components/icons';
+import { Icon, type IconName } from '@/components/icons';
 import { formatMark } from '@/lib/marks';
 import { RoundLink, Shell, macauNow, phaseOf, toMinutes } from '@/components/ui';
 
@@ -12,12 +12,8 @@ function Hero() {
   const phase = meet ? phaseOf(meet, live) : null;
   return (
     <header className="hero">
-      <div className="petals" aria-hidden="true">
-        <Kapok size={180} petal="rgba(255,255,255,.07)" heart="rgba(255,255,255,.07)" />
-      </div>
-      <div className="mark">
-        <Kapok size={44} petal="#c62f2a" heart="#f5b42a" />
-      </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="mark" src="/logo.png" alt="紅棉賽場" width={76} height={76} />
       <div className="school">
         {t('school')} · {t('sportsDay')}
       </div>

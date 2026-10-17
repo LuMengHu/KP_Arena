@@ -283,14 +283,12 @@ main.overlap .demo {
   pointer-events: none;
 }
 .hero .mark {
-  width: 64px;
-  height: 64px;
+  display: block;
+  width: 76px;
+  height: 76px;
   margin: 0 auto 12px;
   border-radius: 20px;
-  background: #fff;
-  display: grid;
-  place-items: center;
-  box-shadow: 0 8px 22px rgba(60, 0, 0, 0.3);
+  box-shadow: 0 8px 22px rgba(40, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 .hero .school {
   font-size: 13px;
@@ -1173,13 +1171,11 @@ input[type='file'] {
   padding: 24px;
 }
 .adminLogin .mark {
-  width: 56px;
-  height: 56px;
+  display: block;
+  width: 64px;
+  height: 64px;
   margin: 0 auto 4px;
-  border-radius: 18px;
-  background: var(--brand);
-  display: grid;
-  place-items: center;
+  border-radius: 16px;
 }
 .adminLogin h2 {
   text-align: center;
