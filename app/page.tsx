@@ -71,7 +71,7 @@ function LoginCard() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!who.trim() || !pin.trim()) return setError(mode === 'class' ? '請輸入班級代號和密碼' : '請輸入號碼布和班級密碼');
+    if (!who.trim() || !pin.trim()) return setError(mode === 'class' ? '請輸入班級和密碼' : '請輸入號碼布和班級密碼');
     setBusy(true);
     const err = await login(mode === 'class' ? { type: 'class', cls: who, pin } : { type: 'athlete', bib: who, pin });
     setBusy(false);
@@ -108,7 +108,7 @@ function LoginCard() {
       </div>
       <form onSubmit={submit} className="idform">
         <label>
-          <span className="sub">{mode === 'class' ? '班級代號' : '號碼布'}</span>
+          <span className="sub">{mode === 'class' ? '班級' : '號碼布'}</span>
           <input
             autoComplete="off"
             autoCapitalize="characters"
