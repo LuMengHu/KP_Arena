@@ -530,10 +530,6 @@ input[type='file'] {
   text-align: center;
   letter-spacing: 2px;
 }
-.privacy {
-  margin: 14px 0 0;
-  font-size: 12px;
-}
 
 .idcard {
   display: flex;
@@ -1311,4 +1307,10 @@ div.warn {
 .ghost.danger {
   border-color: #d32f2f;
   color: #d32f2f;
+}
+.rankno.sm {
+  width: 26px;
+  height: 26px;
+  font-size: 13px;
+  margin-top: 5px;
 }

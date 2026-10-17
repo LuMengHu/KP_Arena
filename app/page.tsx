@@ -129,7 +129,6 @@ function IdentityPicker() {
           ))}
         </div>
       )}
-      <p className="sub center privacy">身份只存在這部手機，用來標出你的項目，不會上傳。</p>
     </section>
   );
 }

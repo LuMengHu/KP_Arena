@@ -88,7 +88,7 @@ function ResultEditor({
   const relay = round.kind === 'relay' || round.kind === 'other';
   const existing = live.results[round.id];
   const initial = (): ResultRow[] => {
-    // ranks are re-computed from marks on every publish; type a rank only to override (e.g. photo finish)
+    // ranks are always computed from marks (here for display, and again on the server when publishing)
     if (existing) return existing.rows.map((r) => ({ ...r, rank: null, record: undefined }));
     if (round.entries.length)
       return [...round.entries]
@@ -113,11 +113,9 @@ function ResultEditor({
   const filled = named.filter((r) => r.mark.trim() || r.status);
   const blank = named.length - filled.length;
   const warn = warnings(filled, round, meet);
-  const preview = finalizeRows(
-    filled.map((r) => ({ ...r })),
-    round,
-    recordFor(meet, round),
-  );
+  const copies = filled.map((r) => ({ ...r, rank: null }));
+  const preview = finalizeRows(copies, round, recordFor(meet, round));
+  const rankOf = new Map(copies.map((c, i) => [filled[i], c.rank]));
   const record = recordFor(meet, round);
 
   const send = async (body: object, ok: string) => {
@@ -142,7 +140,7 @@ function ResultEditor({
       <div className="sub">
         {record ? `大會紀錄 ${record.mark}（${record.holder} ${record.year}）· ` : ''}
         {round.kind === 'field' ? '成績越大越好，例如 5.20' : '成績越小越好，例如 12.34 或 2:15.30'}
-        {' · '}名次可留空，系統按成績自動排
+        {' · '}名次按成績自動計算，同成績同名次
       </div>
       <table className="tbl edit" ref={table}>
         <thead>
@@ -187,7 +185,7 @@ function ResultEditor({
                   />
                 </td>
                 <td>
-                  <input className="w2" inputMode="numeric" value={r.rank ?? ''} onChange={(e) => set(i, { rank: Number(e.target.value) || null })} />
+                  <span className={`rankno sm ${rankOf.get(r) && rankOf.get(r)! <= 3 ? `m${rankOf.get(r)}` : ''}`}>{rankOf.get(r) ?? '–'}</span>
                 </td>
                 <td>
                   <select value={r.status ?? ''} onChange={(e) => set(i, { status: e.target.value as ResultRow['status'] })}>
