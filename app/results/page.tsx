@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { Empty, RoundLink, Shell } from '@/components/ui';
+import { formatMark } from '@/lib/marks';
 
 const GROUPS = ['甲', '乙', '丙', '丁', '戊'];
 
@@ -29,7 +30,7 @@ export default function ResultsPage() {
         {done.length === 0 ? <Empty icon="trophy">{t('noResults')}</Empty> : null}
         {done.map((r) => {
           const top = live!.results[r.id].rows.filter((x) => x.rank === 1 && !x.status);
-          const names = top.map((x) => `${x.name || athleteByBib.get(x.bib ?? '')?.name || x.team || x.bib} ${x.mark}`);
+          const names = top.map((x) => `${x.name || athleteByBib.get(x.bib ?? '')?.name || x.team || x.bib} ${formatMark(x.mark, r.kind)}`);
           return <RoundLink key={r.id} round={r} showDay extra={names.length ? `冠軍 ${names.join('、')}` : null} />;
         })}
       </section>

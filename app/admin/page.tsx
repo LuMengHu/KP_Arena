@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, Kapok } from '@/components/icons';
 import { macauNow } from '@/components/ui';
 import { parseWorkbook, type ImportResult } from '@/lib/excel';
-import { finalizeRows, markValue, recordFor, warnings } from '@/lib/marks';
+import { finalizeRows, formatMark, markValue, recordFor, warnings } from '@/lib/marks';
 import type { Live, Meet, ResultRow, Round } from '@/lib/types';
 
 type Staff = { role: 'admin' | 'entry'; name: string };
@@ -155,8 +155,8 @@ function ResultEditor({
         #{round.id} · {round.time} · {round.title}
       </h3>
       <div className="sub">
-        {record ? `大會紀錄 ${record.mark}（${record.holder} ${record.year}）· ` : ''}
-        {round.kind === 'field' ? '成績越大越好，例如 5.20' : '成績越小越好，例如 12.34 或 2:15.30'}
+        {record ? `大會紀錄 ${formatMark(record.mark, round.kind)}（${record.holder} ${record.year}）· ` : ''}
+        {round.kind === 'field' ? '單位是米，越大越好，例如 5.20' : '單位是秒，越小越好，例如 12.34 或 2:15.30（2分15.30秒）'}
         {' · '}名次按成績自動計算，同成績同名次
       </div>
       <table className="tbl edit" ref={table}>
@@ -164,7 +164,7 @@ function ResultEditor({
           <tr>
             <th>組</th>
             <th>{relay ? '隊伍 / 班級' : '號碼 / 姓名'}</th>
-            <th>成績</th>
+            <th>成績（{round.kind === 'field' ? '米' : '秒'}）</th>
             <th>名次</th>
             <th>狀態</th>
             <th />
@@ -243,7 +243,7 @@ function ResultEditor({
           🔥 將標示破紀錄：
           {preview
             .filter((r) => r.record)
-            .map((r) => `${r.bib || r.team} ${r.mark}`)
+            .map((r) => `${r.bib || r.team} ${formatMark(r.mark, round.kind)}`)
             .join('、')}
           。請總裁判確認後才發佈。
         </div>

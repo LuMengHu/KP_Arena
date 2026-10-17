@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useApp } from '@/components/AppProvider';
 import { Icon, Kapok, type IconName } from '@/components/icons';
+import { formatMark } from '@/lib/marks';
 import { RoundLink, Shell, macauNow, phaseOf, toMinutes } from '@/components/ui';
 
 function Hero() {
@@ -255,7 +256,7 @@ function Menu() {
               showDay
               extra={live!.results[r.id].rows
                 .filter((x) => x.rank === 1)
-                .map((x) => `冠軍 ${x.name || athleteByBib.get(x.bib ?? '')?.name || x.team || x.bib} ${x.mark}`)
+                .map((x) => `冠軍 ${x.name || athleteByBib.get(x.bib ?? '')?.name || x.team || x.bib} ${formatMark(x.mark, r.kind)}`)
                 .join('、')}
             />
           ))}

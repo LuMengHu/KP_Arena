@@ -5,7 +5,7 @@ import { useApp } from '@/components/AppProvider';
 import { Icon } from '@/components/icons';
 import { Empty, Shell } from '@/components/ui';
 import { titleFor } from '@/lib/eventName';
-import { recordFor } from '@/lib/marks';
+import { formatMark, formatMarkFor, recordFor } from '@/lib/marks';
 
 export default function RecordsPage() {
   const { t, meet, live, athleteByBib } = useApp();
@@ -35,11 +35,11 @@ export default function RecordsPage() {
               </div>
               {old ? (
                 <div className="sub">
-                  舊紀錄 {old.mark}（{old.holder} {old.year}）
+                  舊紀錄 {formatMark(old.mark, r.kind)}（{old.holder} {old.year}）
                 </div>
               ) : null}
             </div>
-            <b className="mk">{row.mark}</b>
+            <b className="mk">{formatMark(row.mark, r.kind)}</b>
           </Link>
         );
       })}
@@ -53,7 +53,7 @@ export default function RecordsPage() {
                 <span className="sub">
                   {rec.holder} {rec.year}
                 </span>
-                <b>{rec.mark}</b>
+                <b>{formatMarkFor(rec.mark, rec.key)}</b>
               </li>
             ))}
           </ul>

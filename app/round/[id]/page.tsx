@@ -5,7 +5,7 @@ import { useApp } from '@/components/AppProvider';
 import { Icon } from '@/components/icons';
 import { Empty, LoginNeeded, ResultTable, Shell, StatusBadge, dayLabel, statusOf } from '@/components/ui';
 import { titleFor } from '@/lib/eventName';
-import { recordFor } from '@/lib/marks';
+import { formatMark, recordFor } from '@/lib/marks';
 import type { Entry } from '@/lib/types';
 
 const ROUND_NAME: Record<string, string> = {
@@ -66,7 +66,7 @@ export default function RoundPage() {
         {record ? (
           <div className="recbox">
             <span className="lbl">{t('record')}</span>
-            <b>{record.mark}</b>
+            <b>{formatMark(record.mark, round.kind)}</b>
             <span className="sub">
               {record.holder} · {record.year}
             </span>
@@ -81,7 +81,7 @@ export default function RoundPage() {
           <Icon name="flame" size={22} />
           <div>
             <b>打破大會紀錄！</b>
-            <div>{broke.map((r) => `${r.name || athleteByBib.get(r.bib ?? '')?.name || r.team} ${r.mark}`).join('、')}</div>
+            <div>{broke.map((r) => `${r.name || athleteByBib.get(r.bib ?? '')?.name || r.team} ${formatMark(r.mark, round.kind)}`).join('、')}</div>
           </div>
         </div>
       ) : null}
@@ -100,7 +100,7 @@ export default function RoundPage() {
               發佈
             </span>
           </h3>
-          <ResultTable rows={result.rows} highlight={(r) => isMe(r.bib, r.cls ?? r.team)} />
+          <ResultTable rows={result.rows} kind={round.kind} highlight={(r) => isMe(r.bib, r.cls ?? r.team)} />
         </section>
       ) : null}
 

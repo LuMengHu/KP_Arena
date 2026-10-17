@@ -5,6 +5,7 @@ import { useApp } from '@/components/AppProvider';
 import { Icon } from '@/components/icons';
 import { Empty, Rank, Shell, StatusBadge, statusOf } from '@/components/ui';
 import { titleFor } from '@/lib/eventName';
+import { formatMark } from '@/lib/marks';
 
 // "My results": an athlete's own events, or every event a class takes part in.
 export default function MePage() {
@@ -65,7 +66,7 @@ export default function MePage() {
                   <div key={i} className="mres">
                     <Rank n={x.status ? null : x.rank} />
                     <span className="grow">{identity.type === 'class' ? x.name || athleteByBib.get(x.bib ?? '')?.name || x.team : ''}</span>
-                    <b>{x.status ? x.status : x.mark}</b>
+                    <b>{x.status ? x.status : formatMark(x.mark, r.kind)}</b>
                     {x.record ? <Icon name="flame" size={14} className="flame" /> : null}
                   </div>
                 ))

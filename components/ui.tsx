@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { titleFor } from '@/lib/eventName';
+import { formatMark } from '@/lib/marks';
 import type { Live, Meet, ResultRow, Round } from '@/lib/types';
 import { useApp } from './AppProvider';
 import { Icon, type IconName } from './icons';
@@ -158,7 +159,7 @@ export function Rank({ n }: { n?: number | null }) {
   return <span className={`rankno ${n <= 3 ? `m${n}` : ''}`}>{n}</span>;
 }
 
-export function ResultTable({ rows, highlight }: { rows: ResultRow[]; highlight?: (r: ResultRow) => boolean }) {
+export function ResultTable({ rows, kind, highlight }: { rows: ResultRow[]; kind: Round['kind']; highlight?: (r: ResultRow) => boolean }) {
   const { t, athleteByBib } = useApp();
   return (
     <ol className="results">
@@ -176,7 +177,7 @@ export function ResultTable({ rows, highlight }: { rows: ResultRow[]; highlight?
               </div>
             </div>
             <div className="mk">
-              {r.status ? <span className="st">{STATUS[r.status]}</span> : r.mark}
+              {r.status ? <span className="st">{STATUS[r.status]}</span> : formatMark(r.mark, kind)}
               {r.record ? (
                 <span className="rec">
                   <Icon name="flame" size={12} /> {t('newRecord')}
