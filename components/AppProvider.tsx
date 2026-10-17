@@ -24,7 +24,7 @@ interface Ctx {
   identity: Identity | null;
   loggedIn: boolean;
   /** resolves to an error message, or '' when logged in */
-  login: (body: { type: 'class'; cls: string; pin: string } | { type: 'athlete'; cls: string; bib: string }) => Promise<string>;
+  login: (body: { type: 'class'; cls: string; pin: string } | { type: 'athlete'; bib: string; pin: string }) => Promise<string>;
   logout: () => void;
   /** set when a saved login stopped working (the school changed the key) */
   expired: boolean;

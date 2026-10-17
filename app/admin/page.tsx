@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, Kapok } from '@/components/icons';
 import { macauNow } from '@/components/ui';
 import { parseWorkbook, type ImportResult } from '@/lib/excel';
-import { finalizeRows, recordFor, warnings } from '@/lib/marks';
+import { finalizeRows, markValue, recordFor, warnings } from '@/lib/marks';
 import type { Live, Meet, ResultRow, Round } from '@/lib/types';
 
 type Staff = { role: 'admin' | 'entry'; name: string };
@@ -123,8 +123,8 @@ function ResultEditor({
 
   const set = (i: number, patch: Partial<ResultRow>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const named = rows.filter((r) => r.bib || r.team || r.name);
-  // rows without a mark or status are left out, so one heat can be published before the next is run
-  const filled = named.filter((r) => r.mark.trim() || r.status);
+  // every athlete on the sheet needs a valid mark or a status (DNS/DNF/DQ) before the round can be published
+  const filled = named.filter((r) => r.status || markValue(r.mark) !== null);
   const blank = named.length - filled.length;
   const warn = warnings(filled, round, meet);
   const copies = filled.map((r) => ({ ...r, rank: null }));
@@ -230,7 +230,7 @@ function ResultEditor({
       <button className="link" onClick={() => setRows((rs) => [...rs, emptyRow()])}>
         <Icon name="plus" size={14} /> 加一行
       </button>
-      {blank ? <div className="sub">另有 {blank} 行未填成績，不會發佈。</div> : null}
+      {blank ? <div className="warn">還有 {blank} 行未填成績或成績格式不對。全部填完才能發佈；沒有出賽的請在「狀態」選 DNS，或刪除該行。</div> : null}
       {warn.length ? (
         <ul className="warn">
           {warn.map((w, i) => (
@@ -259,7 +259,7 @@ function ResultEditor({
         ) : null}
         <button
           className="primary"
-          disabled={busy || !filled.length}
+          disabled={busy || !filled.length || blank > 0}
           onClick={() =>
             confirm(`已對照紙本核對 ${filled.length} 行成績，確定發佈？`) && send({ action: 'publish', rows: filled }, '✅ 已發佈，觀眾約 30 秒內看到')
           }
@@ -571,7 +571,7 @@ function PinsTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => void 
   };
   const download = () => {
     // BOM so Excel opens the Chinese text correctly
-    const csv = '\ufeff班級,登入密碼,運動員人數\n' + pins.map(([c, p]) => `${c},'${p},${counts.get(c) ?? 0}`).join('\n');
+    const csv = '\ufeff班級,登入密碼\n' + pins.map(([c, p]) => `${c},'${p}`).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     a.download = '班級密碼.csv';
@@ -582,8 +582,7 @@ function PinsTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => void 
     <div className="card">
       <h3>班級登入密碼</h3>
       <p className="sub">
-        每班一個 4
-        位數字密碼，交給班主任轉告同學和家長。用班級加密碼登入可看全部名單和成績，並標出本班。運動員也可以用「班級＋號碼布」登入。沒有登入的人只看到賽程。
+        每班一個 4 位數字密碼，交給班主任轉告同學和家長。班級用「班級代號＋密碼」登入，運動員用「號碼布＋所屬班級的密碼」登入。沒有登入的人只看到賽程。
         匯入名單時，新班級會自動產生密碼。
       </p>
       {missing ? (
@@ -615,7 +614,6 @@ function PinsTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => void 
               <tr>
                 <th>班級</th>
                 <th>密碼</th>
-                <th>人數</th>
                 <th />
               </tr>
             </thead>
@@ -624,7 +622,6 @@ function PinsTab({ state, setMeet }: { state: State; setMeet: (m: Meet) => void 
                 <tr key={cls}>
                   <td>{cls}</td>
                   <td className="mono">{pin}</td>
-                  <td>{counts.get(cls) ?? 0}</td>
                   <td>
                     <button
                       className="link"

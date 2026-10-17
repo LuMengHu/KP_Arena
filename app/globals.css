@@ -582,8 +582,39 @@ input[type='file'] {
   gap: 12px;
   margin-bottom: 12px;
 }
+.tile .txt {
+  display: flex;
+  flex-direction: column;
+}
+/* visitors only get the schedule: one wide tile that fills the card */
 .tiles.one {
   grid-template-columns: 1fr;
+}
+.tiles.one .tile {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 20px;
+}
+.tiles.one .tile .ico {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  margin: 0;
+  flex: none;
+}
+.tiles.one .tile .txt {
+  flex: 1;
+}
+.tiles.one .tile b {
+  font-size: 22px;
+}
+.tiles.one .tile small {
+  font-size: 14px;
+  margin-top: 2px;
+}
+.tiles.one .tile .go {
+  color: var(--muted);
 }
 .tile {
   background: var(--card);

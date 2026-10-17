@@ -1,4 +1,4 @@
-// Viewer login: a class with its 4-digit PIN, or an athlete with class code + bib.
+// Viewer login: class code + the class's 4-digit PIN, or an athlete's bib + their class's PIN.
 // On success returns the data key that decrypts meet.json / live.json in the browser.
 import { NextResponse } from 'next/server';
 import { normCls } from '@/lib/pins';
@@ -26,30 +26,23 @@ export async function POST(req: Request) {
   const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'local';
   if (tooMany(ip)) return NextResponse.json({ error: '嘗試次數太多，請 10 分鐘後再試' }, { status: 429 });
   const body = await req.json().catch(() => ({}));
-  const cls = normCls(String(body.cls ?? ''));
-  if (!cls) return NextResponse.json({ error: '請輸入班級' }, { status: 400 });
+  const pin = String(body.pin ?? '').trim();
 
   try {
     const { doc: meet } = await loadMeet();
+    const pins = meet.classPins ?? {};
     if (body.type === 'class') {
-      const pin = String(body.pin ?? '').trim();
-      const entry = Object.entries(meet.classPins ?? {}).find(([c]) => normCls(c) === cls);
+      const cls = normCls(String(body.cls ?? ''));
+      const entry = Object.entries(pins).find(([c]) => normCls(c) === cls);
       if (!entry || !/^\d{4}$/.test(pin) || entry[1] !== pin) return fail(ip, '班級或密碼不正確');
-      return NextResponse.json({
-        key: dataKeyB64(),
-        identity: { type: 'class', cls: entry[0] },
-      });
+      return NextResponse.json({ key: dataKeyB64(), identity: { type: 'class', cls: entry[0] } });
     }
     if (body.type === 'athlete') {
-      const bib = String(body.bib ?? '')
-        .trim()
-        .toUpperCase();
-      const a = meet.athletes.find((x) => x.bib.toUpperCase() === bib && normCls(x.cls) === cls);
-      if (!a) return fail(ip, '班級和號碼布對不上');
-      return NextResponse.json({
-        key: dataKeyB64(),
-        identity: { type: 'athlete', cls: a.cls, bib: a.bib },
-      });
+      // an athlete proves membership with the bib plus the PIN of their own class
+      const bib = String(body.bib ?? '').trim().toUpperCase();
+      const a = meet.athletes.find((x) => x.bib.toUpperCase() === bib);
+      if (!a || !/^\d{4}$/.test(pin) || pins[a.cls] !== pin) return fail(ip, '號碼布或密碼不正確');
+      return NextResponse.json({ key: dataKeyB64(), identity: { type: 'athlete', cls: a.cls, bib: a.bib } });
     }
     return NextResponse.json({ error: 'bad request' }, { status: 400 });
   } catch (e) {

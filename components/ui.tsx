@@ -95,7 +95,7 @@ export function LoginNeeded({ compact }: { compact?: boolean }) {
         <Icon name="lock" size={24} />
       </span>
       <h2>登入後可查看</h2>
-      <p className="sub">比賽名單、成績和相片只供本校班級及運動員查看。請用班級密碼，或班級代號加號碼布登入。</p>
+      <p className="sub">比賽名單、成績和相片只供本校班級及運動員查看。請用班級代號或號碼布，加上班級密碼登入。</p>
       <Link href="/#login" className="primary inline">
         前往登入
       </Link>

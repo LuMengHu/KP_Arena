@@ -64,16 +64,16 @@ function PhaseStrip({ phase }: { phase: ReturnType<typeof phaseOf> }) {
 function LoginCard() {
   const { login, expired } = useApp();
   const [mode, setMode] = useState<'class' | 'athlete'>('class');
-  const [cls, setCls] = useState('');
-  const [secret, setSecret] = useState('');
+  const [who, setWho] = useState(''); // class code, or bib for an athlete
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cls.trim() || !secret.trim()) return setError(mode === 'class' ? '請輸入班級和密碼' : '請輸入班級和號碼布');
+    if (!who.trim() || !pin.trim()) return setError(mode === 'class' ? '請輸入班級代號和密碼' : '請輸入號碼布和班級密碼');
     setBusy(true);
-    const err = await login(mode === 'class' ? { type: 'class', cls, pin: secret } : { type: 'athlete', cls, bib: secret });
+    const err = await login(mode === 'class' ? { type: 'class', cls: who, pin } : { type: 'athlete', bib: who, pin });
     setBusy(false);
     setError(err);
   };
@@ -97,7 +97,7 @@ function LoginCard() {
             className={mode === k ? 'on' : ''}
             onClick={() => {
               setMode(k);
-              setSecret('');
+              setWho('');
               setError('');
             }}
           >
@@ -108,29 +108,30 @@ function LoginCard() {
       </div>
       <form onSubmit={submit} className="idform">
         <label>
-          <span className="sub">班級代號</span>
+          <span className="sub">{mode === 'class' ? '班級代號' : '號碼布'}</span>
           <input
             autoComplete="off"
             autoCapitalize="characters"
-            placeholder="例如 S5A"
-            value={cls}
+            inputMode={mode === 'class' ? 'text' : 'numeric'}
+            placeholder={mode === 'class' ? '例如 S5A' : '例如 1021'}
+            value={who}
             onChange={(e) => {
-              setCls(e.target.value);
+              setWho(e.target.value);
               setError('');
             }}
           />
         </label>
         <label>
-          <span className="sub">{mode === 'class' ? '班級密碼（4 位數字，向班主任索取）' : '號碼布'}</span>
+          <span className="sub">{mode === 'class' ? '班級密碼（4 位數字，向班主任索取）' : '所屬班級的密碼（4 位數字，向班主任索取）'}</span>
           <input
             autoComplete="off"
             inputMode="numeric"
-            type={mode === 'class' ? 'password' : 'text'}
-            maxLength={mode === 'class' ? 4 : 10}
-            placeholder={mode === 'class' ? '••••' : '例如 1021'}
-            value={secret}
+            type="password"
+            maxLength={4}
+            placeholder="••••"
+            value={pin}
             onChange={(e) => {
-              setSecret(e.target.value);
+              setPin(e.target.value);
               setError('');
             }}
           />
@@ -140,7 +141,7 @@ function LoginCard() {
           {busy ? '登入中…' : '登入'}
         </button>
       </form>
-      <p className="sub center">未登入可瀏覽賽程</p>
+      <p className="sub center">未登入只可瀏覽賽程</p>
     </section>
   );
 }
@@ -205,10 +206,13 @@ function Menu() {
         {tiles.map(([href, icon, label, sub]) => (
           <Link key={href} href={href} className="tile">
             <span className="ico">
-              <Icon name={icon} size={22} />
+              <Icon name={icon} size={tiles.length === 1 ? 30 : 22} />
             </span>
-            <b>{label}</b>
-            <small>{sub}</small>
+            <span className="txt">
+              <b>{label}</b>
+              <small>{sub}</small>
+            </span>
+            {tiles.length === 1 ? <Icon name="chevron" size={22} className="go" /> : null}
           </Link>
         ))}
       </div>
