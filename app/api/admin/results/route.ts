@@ -1,6 +1,6 @@
 // Publish / withdraw a round's results, or mark a round as running.
 import { BadRequest, guarded } from '@/lib/guard';
-import { finalizeRows, markValue, recordFor } from '@/lib/marks';
+import { finalizeRows, markValue, parseMark, recordFor } from '@/lib/marks';
 import { loadMeet, updateLive } from '@/lib/storage';
 import type { ResultRow } from '@/lib/types';
 
@@ -43,8 +43,10 @@ export async function POST(req: Request) {
         };
       });
     if (!rows.length) throw new BadRequest('沒有成績可發佈');
-    const blank = rows.filter((r) => !r.status && markValue(r.mark) === null);
+    const blank = rows.filter((r) => !r.status && markValue(r.mark, round.kind) === null);
     if (blank.length) throw new BadRequest(`還有 ${blank.length} 行未填成績（${blank.map((r) => r.bib || r.team || r.name).join('、')}），全部填完才能發佈`);
+    // store one spelling: 10'20"39 / 10.20.39 -> 10:20.39, 23.69 stays 23.69
+    for (const r of rows) if (!r.status) r.mark = parseMark(r.mark, round.kind)?.canonical ?? r.mark;
     const finalRows = finalizeRows(rows, round, recordFor(meet, round));
     const live = await updateLive((l) => {
       l.results[round.id] = { rows: finalRows, publishedAt: new Date().toISOString(), by: staff.name };

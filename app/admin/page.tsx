@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/icons';
 import { macauNow } from '@/components/ui';
 import { parseWorkbook, type ImportResult } from '@/lib/excel';
-import { finalizeRows, formatMark, markValue, recordFor, warnings } from '@/lib/marks';
+import { finalizeRows, formatMark, markValue, recordFor, shapeMix, warnings } from '@/lib/marks';
 import type { Live, Meet, ResultRow, Round } from '@/lib/types';
 
 type Staff = { role: 'admin' | 'entry'; name: string };
@@ -123,9 +123,10 @@ function ResultEditor({
   const set = (i: number, patch: Partial<ResultRow>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
   const named = rows.filter((r) => r.bib || r.team || r.name);
   // every athlete on the sheet needs a valid mark or a status (DNS/DNF/DQ) before the round can be published
-  const filled = named.filter((r) => r.status || markValue(r.mark) !== null);
+  const filled = named.filter((r) => r.status || markValue(r.mark, round.kind) !== null);
   const blank = named.length - filled.length;
   const warn = warnings(filled, round, meet);
+  const mixed = shapeMix(filled, round.kind);
   const copies = filled.map((r) => ({ ...r, rank: null }));
   const preview = finalizeRows(copies, round, recordFor(meet, round));
   const rankOf = new Map(copies.map((c, i) => [filled[i], c.rank]));
@@ -155,7 +156,7 @@ function ResultEditor({
       </h3>
       <div className="sub">
         {record ? `大會紀錄 ${formatMark(record.mark, round.kind)}（${record.holder} ${record.year}）· ` : ''}
-        {round.kind === 'field' ? '單位是米，越大越好，例如 5.20' : '單位是秒，越小越好，例如 12.34 或 2:15.30（2分15.30秒）'}
+        {round.kind === 'field' ? '單位是米，越大越好，例如 5.20' : '單位是秒，越小越好：一分鐘內輸入兩段，例如 12.34；超過一分鐘輸入三段，例如 10.20.39（10分20.39秒）'}
         {' · '}名次按成績自動計算，同成績同名次
       </div>
       <table className="tbl edit" ref={table}>
@@ -204,6 +205,11 @@ function ResultEditor({
                     onKeyDown={(e) => nextMark(e, i)}
                     onChange={(e) => set(i, { mark: e.target.value })}
                   />
+                  {r.mark.trim() && !r.status ? (
+                    <div className={`sub nowrap ${markValue(r.mark, round.kind) === null ? 'bad' : ''}`}>
+                      {markValue(r.mark, round.kind) === null ? '無法識別' : `= ${formatMark(r.mark, round.kind)}`}
+                    </div>
+                  ) : null}
                 </td>
                 <td>
                   <span className={`rankno sm ${rankOf.get(r) && rankOf.get(r)! <= 3 ? `m${rankOf.get(r)}` : ''}`}>{rankOf.get(r) ?? '–'}</span>
@@ -260,7 +266,9 @@ function ResultEditor({
           className="primary"
           disabled={busy || !filled.length || blank > 0}
           onClick={() =>
-            confirm(`已對照紙本核對 ${filled.length} 行成績，確定發佈？`) && send({ action: 'publish', rows: filled }, '✅ 已發佈，觀眾約 30 秒內看到')
+            confirm(
+              (mixed ? `⚠️ ${mixed}\n\n如確實不同（例如 400 米有人超過一分鐘），可照樣發佈。\n\n` : '') + `已對照紙本核對 ${filled.length} 行成績，確定發佈？`,
+            ) && send({ action: 'publish', rows: filled }, '✅ 已發佈，觀眾約 30 秒內看到')
           }
         >
           {existing ? '更新發佈' : '發佈成績'}

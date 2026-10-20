@@ -1439,3 +1439,7 @@ table.pins .mono {
   font-size: 17px;
   letter-spacing: 2px;
 }
+
+.editor .sub.bad {
+  color: var(--live);
+}
